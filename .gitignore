@@ -1,0 +1,155 @@
+# ─────────────────────────────────────────────
+# Flutter / Dart / Pub
+# ─────────────────────────────────────────────
+# Dart tool cache
+.dart_tool/
+
+# Pub package cache
+.pub-cache/
+.pub/
+
+# Flutter-generated plugin registry files (ephemeral)
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Generated localisation files (produced by `flutter gen-l10n`)
+# Comment out the next line if you commit generated l10n files.
+# lib/generated/
+
+# Drift / build_runner output
+# NOTE: app_database.g.dart IS committed so the app builds without running build_runner.
+# If you prefer to keep generated files out of VCS, uncomment the line below:
+# **/*.g.dart
+
+# Build output
+/build/
+/coverage/
+
+# ─────────────────────────────────────────────
+# Android
+# ─────────────────────────────────────────────
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+
+# Signing key — NEVER commit your keystore or key.properties
+android/key.properties
+android/*.jks
+android/*.keystore
+android/app/*.jks
+android/app/*.keystore
+
+# Gradle caches and local config
+.gradle/
+**/android/.gradle/
+local.properties
+**/GeneratedPluginRegistrant.java
+
+# Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# ─────────────────────────────────────────────
+# iOS / macOS (Xcode)
+# ─────────────────────────────────────────────
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+
+# Xcode derived data & archives
+**/DerivedData/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# CocoaPods
+**/Pods/
+**/ios/Podfile.lock
+**/macos/Podfile.lock
+
+# ─────────────────────────────────────────────
+# Windows
+# ─────────────────────────────────────────────
+**/windows/flutter/ephemeral/
+
+# ─────────────────────────────────────────────
+# Linux
+# ─────────────────────────────────────────────
+**/linux/flutter/ephemeral/
+
+# ─────────────────────────────────────────────
+# macOS (project-level)
+# ─────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+
+# ─────────────────────────────────────────────
+# IDEs & Editors
+# ─────────────────────────────────────────────
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code — launch configs and tasks are personal; keep out of VCS.
+# Comment the line below if your team shares launch configurations.
+.vscode/
+
+# Vim / Emacs swap files
+*.swp
+*.swo
+.atom/
+
+# ─────────────────────────────────────────────
+# Miscellaneous
+# ─────────────────────────────────────────────
+# Compiled class files
+*.class
+*.pyc
+
+# Log files
+*.log
+
+# Symbolication / obfuscation maps
+app.*.symbols
+app.*.map.json
+
+# SVN
+.svn/
+
+# Swift package manager
+.swiftpm/
+
+# Migration working directory (flutter migrate)
+migrate_working_dir/
+
+# Build log artefacts
+.buildlog/
+.history
+
+# ─────────────────────────────────────────────
+# Project-specific
+# ─────────────────────────────────────────────
+# Local SQLite database — runtime data, not source code
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
+# Environment / secrets (if you ever add them)
+.env
+.env.*
+secrets.dart
+secrets.json
