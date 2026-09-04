@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
-import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/models/app_models.dart';
 import '../../../../core/state/app_cubit.dart';
 import '../../../../core/utils/formatters.dart';
@@ -42,7 +41,6 @@ class _PosView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
     final appState = context.watch<AppCubit>().state;
 
     return BlocBuilder<PosCubit, PosState>(
@@ -53,7 +51,7 @@ class _PosView extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(l10n.tr('pos')),
+            title: const Text('نقطة البيع'),
             actions: [
               IconButton(
                 icon: const Icon(Icons.qr_code_scanner),
@@ -66,7 +64,7 @@ class _PosView extends StatelessWidget {
             child: Column(
               children: [
                 AppTextField(
-                  hint: l10n.tr('searchProducts'),
+                  hint: 'البحث عن منتج...',
                   onChanged: (value) => context.read<PosCubit>().updateFilter(search: value),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.search),
@@ -80,7 +78,7 @@ class _PosView extends StatelessWidget {
                     scrollDirection: Axis.horizontal,
                     children: [
                       FilterChip(
-                        label: const Text('All'),
+                        label: const Text('الكل'),
                         selected: state.filter.categoryId == null,
                         onSelected: (_) => context.read<PosCubit>().updateFilter(categoryId: -1),
                       ),
@@ -96,7 +94,7 @@ class _PosView extends StatelessWidget {
                         ),
                       ),
                       FilterChip(
-                        label: Text(l10n.tr('lowStock')),
+                        label: const Text('مخزون منخفض'),
                         selected: state.filter.lowStockOnly,
                         onSelected: (_) => context
                             .read<PosCubit>()
@@ -178,7 +176,7 @@ class _ProductsPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.filteredProducts.isEmpty) {
-      return EmptyState(message: context.l10n.tr('empty'));
+      return const EmptyState(message: 'لا توجد منتجات');
     }
 
     return ListView.separated(
@@ -215,7 +213,7 @@ class _CartPane extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Text(
-              context.l10n.tr('cartEmpty'),
+              'السلة فارغة',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
@@ -289,24 +287,24 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Checkout details',
+                      'تفاصيل الدفع',
                       style: Theme.of(sheetContext).textTheme.titleLarge,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AmountField(
                       controller: discountController,
-                      label: sheetContext.l10n.tr('orderDiscount'),
+                      label: 'خصم الفاتورة',
                       onChanged: (_) {},
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     AppDropdown<PaymentMethod>(
-                      label: 'Payment',
+                      label: 'طريقة الدفع',
                       value: method,
                       items: PaymentMethod.values
                           .map(
                             (value) => DropdownMenuItem(
                               value: value,
-                              child: Text(value.value.toUpperCase()),
+                              child: Text(value.value == 'cash' ? 'نقداً (كاش)' : value.value.toUpperCase()),
                             ),
                           )
                           .toList(),
@@ -319,7 +317,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                     const SizedBox(height: AppSpacing.sm),
                     AmountField(
                       controller: paidController,
-                      label: sheetContext.l10n.tr('paid'),
+                      label: 'المبلغ المدفوع',
                       onChanged: (_) {},
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -327,7 +325,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                       children: [
                         Expanded(
                           child: SummaryCard(
-                            title: sheetContext.l10n.tr('total'),
+                            title: 'المجموع الكلي',
                             value: AppFormatters.money(state.total, currency: widget.currency),
                             icon: Icons.payments_outlined,
                           ),
@@ -335,7 +333,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: SummaryCard(
-                            title: sheetContext.l10n.tr('change'),
+                            title: 'الباقي (الفكة)',
                             value: AppFormatters.money(
                               ((double.tryParse(paidController.text) ?? 0) - state.total)
                                   .clamp(0, double.infinity),
@@ -349,7 +347,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     PrimaryButton(
-                      label: sheetContext.l10n.tr('checkout'),
+                      label: 'إتمام العملية',
                       icon: Icons.check_circle_outline,
                       minHeight: 52,
                       onPressed: () async {
@@ -391,7 +389,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
             final isCompact = constraints.maxWidth < 720;
 
             final checkoutButton = PrimaryButton(
-              label: context.l10n.tr('checkout'),
+              label: 'إتمام البيع',
               icon: Icons.check_circle_outline,
               minHeight: 52,
               onPressed: state.cart.isEmpty || state.loading
@@ -407,7 +405,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                     children: [
                       Expanded(
                         child: SummaryCard(
-                          title: context.l10n.tr('total'),
+                          title: 'المجموع',
                           value: AppFormatters.money(state.total, currency: widget.currency),
                           icon: Icons.payments_outlined,
                         ),
@@ -415,7 +413,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: SummaryCard(
-                          title: context.l10n.tr('change'),
+                          title: 'الباقي',
                           value: AppFormatters.money(state.change, currency: widget.currency),
                           icon: Icons.currency_exchange,
                           color: Colors.green,
@@ -430,7 +428,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                     children: [
                       Expanded(
                         child: SummaryCard(
-                          title: context.l10n.tr('total'),
+                          title: 'المجموع',
                           value: AppFormatters.money(state.total, currency: widget.currency),
                           icon: Icons.payments_outlined,
                         ),
@@ -438,7 +436,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: SummaryCard(
-                          title: context.l10n.tr('change'),
+                          title: 'الباقي',
                           value: AppFormatters.money(state.change, currency: widget.currency),
                           icon: Icons.currency_exchange,
                           color: Colors.green,
@@ -463,7 +461,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          state.infoMessage ?? 'Sale completed: ${state.lastResult!.invoiceNo}',
+                          state.infoMessage ?? 'تمت العملية بنجاح - رقم الفاتورة: ${state.lastResult!.invoiceNo}',
                           style: TextStyle(color: Theme.of(context).colorScheme.primary),
                         ),
                         const SizedBox(height: AppSpacing.xs),
@@ -476,19 +474,19 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                                   ? null
                                   : () => context.read<PosCubit>().printLastReceipt(),
                               icon: const Icon(Icons.print_outlined),
-                              label: Text(context.l10n.tr('printReceipt')),
+                              label: const Text('طباعة الفاتورة'),
                             ),
                             OutlinedButton.icon(
                               onPressed: state.receiptProcessing
                                   ? null
                                   : () => context.read<PosCubit>().shareLastReceipt(),
                               icon: const Icon(Icons.share_outlined),
-                              label: Text(context.l10n.tr('sharePdf')),
+                              label: const Text('مشاركة PDF'),
                             ),
                             FilledButton.tonalIcon(
                               onPressed: () => context.read<PosCubit>().newSale(),
                               icon: const Icon(Icons.add_shopping_cart),
-                              label: Text(context.l10n.tr('newSale')),
+                              label: const Text('عملية جديدة'),
                             ),
                           ],
                         ),
