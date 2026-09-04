@@ -35,7 +35,9 @@ class _MiniPosRootState extends State<MiniPosRoot> {
         value: widget.dependencies.appCubit,
         child: BlocBuilder<AppCubit, AppState>(
           builder: (context, state) {
-            final locale = Locale(state.settings.language);
+           // تجعل العربية هي خيار البداية، مع الاحتفاظ بمتغير state ليسمح بالتغيير لاحقاً من الإعدادات
+final languageCode = state.settings.language.isEmpty ? 'ar' : state.settings.language;
+final locale = Locale(languageCode);
             return MaterialApp.router(
               title: 'Mini POS + Inventory',
               debugShowCheckedModeBanner: false,
