@@ -81,7 +81,7 @@ class SeedData {
             secondaryCurrencyCode: const Value('LBP'),
             exchangeRate: const Value(89000),
             taxEnabled: const Value(false),
-            taxRate: const Value(0.14),
+            taxRate: const Value(0.11),
             receiptHeader: const Value('Mini Mart - Welcome'),
             receiptFooter: const Value('Thank you for shopping with us'),
             language: const Value('en'),
