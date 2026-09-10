@@ -40,7 +40,17 @@ class _ProductsView extends StatelessWidget {
     return BlocBuilder<ProductsCubit, ProductsState>(
       builder: (context, state) {
         return Scaffold(
-          appBar: AppBar(title: Text(l10n.tr('products'))),
+          appBar: AppBar(
+            title: Text(l10n.tr('products')),
+            actions: [
+              if (isAdmin)
+                IconButton(
+                  tooltip: 'إدارة الأقسام',
+                  onPressed: () => _showCategoryManager(context),
+                  icon: const Icon(Icons.category_outlined),
+                ),
+            ],
+          ),
           floatingActionButton: isAdmin
               ? FloatingActionButton.extended(
                   onPressed: () => _showProductEditor(context),
@@ -162,6 +172,108 @@ class _ProductsView extends StatelessWidget {
                   ),
               ],
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showCategoryManager(BuildContext context) async {
+    final cubit = context.read<ProductsCubit>();
+    final newCategoryController = TextEditingController();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            top: AppSpacing.lg,
+            bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return BlocBuilder<ProductsCubit, ProductsState>(
+                bloc: cubit,
+                builder: (context, state) {
+                  return SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('إدارة الأقسام', style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: AppSpacing.md),
+                        if (state.categories.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                            child: Text('لا يوجد أقسام بعد'),
+                          )
+                        else
+                          ...state.categories.map(
+                            (c) => ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(c.name),
+                              trailing: IconButton(
+                                icon: Icon(
+                                  Icons.delete_outline,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                                onPressed: () async {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('حذف القسم'),
+                                      content: Text('هل تريد حذف "${c.name}"؟'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(false),
+                                          child: const Text('إلغاء'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () => Navigator.of(ctx).pop(true),
+                                          child: const Text('حذف'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirmed != true) return;
+                                  final error = await cubit.deleteCategory(c.id);
+                                  if (context.mounted && error != null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(error)),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: AppSpacing.md),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AppTextField(
+                                controller: newCategoryController,
+                                label: 'اسم القسم الجديد',
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            FilledButton(
+                              onPressed: () async {
+                                await cubit.saveCategory(newCategoryController.text);
+                                newCategoryController.clear();
+                              },
+                              child: const Text('إضافة'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
           ),
         );
       },
