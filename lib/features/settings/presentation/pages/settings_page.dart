@@ -16,9 +16,9 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  static const List<String> _supportedCurrencies = ['USD', 'LBP'];
+
   late final TextEditingController _storeNameController;
-  late final TextEditingController _currencyController;
-  late final TextEditingController _secondaryCurrencyController;
   late final TextEditingController _exchangeRateController;
   late final TextEditingController _taxRateController;
   late final TextEditingController _receiptHeaderController;
@@ -26,14 +26,15 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _cashierPinController;
   late final TextEditingController _adminPasswordController;
 
+  String _currency = 'USD';
+  String _secondaryCurrency = 'LBP';
+
   bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
     _storeNameController = TextEditingController();
-    _currencyController = TextEditingController();
-    _secondaryCurrencyController = TextEditingController();
     _exchangeRateController = TextEditingController();
     _taxRateController = TextEditingController();
     _receiptHeaderController = TextEditingController();
@@ -45,8 +46,6 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void dispose() {
     _storeNameController.dispose();
-    _currencyController.dispose();
-    _secondaryCurrencyController.dispose();
     _exchangeRateController.dispose();
     _taxRateController.dispose();
     _receiptHeaderController.dispose();
@@ -59,10 +58,12 @@ class _SettingsPageState extends State<SettingsPage> {
   void _syncControllers(AppSettingsModel settings) {
     if (_initialized) return;
     _storeNameController.text = settings.storeName;
-    _currencyController.text = settings.currency;
-    _secondaryCurrencyController.text = settings.secondaryCurrencyCode;
+    _currency = _supportedCurrencies.contains(settings.currency) ? settings.currency : 'USD';
+    _secondaryCurrency =
+        _supportedCurrencies.contains(settings.secondaryCurrencyCode) ? settings.secondaryCurrencyCode : 'LBP';
     _exchangeRateController.text = settings.exchangeRate.toStringAsFixed(0);
-    _taxRateController.text = settings.taxRate.toStringAsFixed(2);
+    // taxRate يتخزن داخليًا كنسبة عشرية (0.11)، بس بيتعرض للمستخدم كنسبة مئوية (11)
+    _taxRateController.text = (settings.taxRate * 100).toStringAsFixed(2);
     _receiptHeaderController.text = settings.receiptHeader;
     _receiptFooterController.text = settings.receiptFooter;
     _cashierPinController.text = settings.cashierPin;
@@ -106,31 +107,51 @@ class _SettingsPageState extends State<SettingsPage> {
                       const SizedBox(height: AppSpacing.md),
                       AppTextField(controller: _storeNameController, label: l10n.tr('storeName')),
                       const SizedBox(height: AppSpacing.sm),
-                      AppTextField(controller: _currencyController, label: l10n.tr('currency')),
-                      const SizedBox(height: AppSpacing.sm),
                       Row(
                         children: [
                           Expanded(
-                            child: AppTextField(
-                              controller: _secondaryCurrencyController,
-                              label: 'Secondary currency (e.g. LBP)',
+                            child: AppDropdown<String>(
+                              value: _currency,
+                              label: l10n.tr('currency'),
+                              items: _supportedCurrencies
+                                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                                  .toList(),
+                              onChanged: state.loading
+                                  ? null
+                                  : (value) {
+                                      if (value == null) return;
+                                      setState(() => _currency = value);
+                                    },
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
-                            child: AppTextField(
-                              controller: _exchangeRateController,
-                              label:
-                                  '1 ${_currencyController.text.trim().isEmpty ? settings.currency : _currencyController.text.trim()} = ? ${_secondaryCurrencyController.text.trim().isEmpty ? settings.secondaryCurrencyCode : _secondaryCurrencyController.text.trim()}',
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            child: AppDropdown<String>(
+                              value: _secondaryCurrency,
+                              label: 'العملة الثانية',
+                              items: _supportedCurrencies
+                                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                                  .toList(),
+                              onChanged: state.loading
+                                  ? null
+                                  : (value) {
+                                      if (value == null) return;
+                                      setState(() => _secondaryCurrency = value);
+                                    },
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       AppTextField(
+                        controller: _exchangeRateController,
+                        label: '1 $_currency = ? $_secondaryCurrency',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      AppTextField(
                         controller: _taxRateController,
-                        label: 'Tax rate (0.14 = 14%)',
+                        label: 'نسبة الضريبة (%)',
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       ),
                       const SizedBox(height: AppSpacing.sm),
@@ -242,19 +263,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 onPressed: state.loading
                     ? null
                     : () async {
+                        final parsedTaxPercent = double.tryParse(_taxRateController.text.trim());
                         final updated = settings.copyWith(
                           storeName: _storeNameController.text.trim().isEmpty
                               ? settings.storeName
                               : _storeNameController.text.trim(),
-                          currency: _currencyController.text.trim().isEmpty
-                              ? settings.currency
-                              : _currencyController.text.trim().toUpperCase(),
-                          secondaryCurrencyCode: _secondaryCurrencyController.text.trim().isEmpty
-                              ? settings.secondaryCurrencyCode
-                              : _secondaryCurrencyController.text.trim().toUpperCase(),
+                          currency: _currency,
+                          secondaryCurrencyCode: _secondaryCurrency,
                           exchangeRate: double.tryParse(_exchangeRateController.text.trim()) ??
                               settings.exchangeRate,
-                          taxRate: double.tryParse(_taxRateController.text.trim()) ?? settings.taxRate,
+                          // بيرجع يتخزن كنسبة عشرية (11 -> 0.11)
+                          taxRate: parsedTaxPercent != null ? parsedTaxPercent / 100 : settings.taxRate,
                           receiptHeader: _receiptHeaderController.text.trim().isEmpty
                               ? settings.receiptHeader
                               : _receiptHeaderController.text.trim(),
