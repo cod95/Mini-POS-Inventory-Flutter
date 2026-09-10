@@ -112,6 +112,24 @@ class ProductsCubit extends Cubit<ProductsState> {
     await load();
   }
 
+  /// Deletes a category. Returns an error message if it can't be deleted
+  /// (e.g. products still reference it), or null on success.
+  Future<String?> deleteCategory(int id) async {
+    final hasProducts = state.products.any((p) => p.categoryId == id);
+    if (hasProducts) {
+      return 'لا يمكن حذف هذا القسم لأنه يحتوي على منتجات. انقل المنتجات أولاً أو احذفها.';
+    }
+    try {
+      await _productRepository.deleteCategory(id);
+      await load();
+      return null;
+    } on AppException catch (e) {
+      return e.message;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
   Future<void> applyStockMovement(StockMovementInput input) async {
     emit(state.copyWith(loading: true, clearError: true));
     try {
