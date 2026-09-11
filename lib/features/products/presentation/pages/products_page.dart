@@ -113,6 +113,7 @@ class _ProductsView extends StatelessWidget {
                         final tile = _ProductListTile(
                           product: product,
                           currency: appState.settings.currency,
+                          exchangeRate: appState.settings.exchangeRate,
                           isAdmin: isAdmin,
                           onEdit: () => _showProductEditor(context, existing: product),
                           onStockAction: () => _showStockActionSheet(context, product),
@@ -281,12 +282,31 @@ class _ProductsView extends StatelessWidget {
   Future<void> _showProductEditor(BuildContext context, {ProductView? existing}) async {
     final cubit = context.read<ProductsCubit>();
     final state = cubit.state;
+    final appState = context.read<AppCubit>().state;
+    final currency = appState.settings.currency;
+    final exchangeRate = appState.settings.exchangeRate;
+
+    // الأسعار المخزّنة بقاعدة البيانات دايمًا بالدولار — بنعرضها هون بالعملة الحالية
+    final existingCostDisplay = existing != null
+        ? (currency == 'LBP' ? existing.cost * exchangeRate : existing.cost)
+        : 0.0;
+    final existingPriceDisplay = existing != null
+        ? (currency == 'LBP' ? existing.price * exchangeRate : existing.price)
+        : 0.0;
 
     final name = TextEditingController(text: existing?.name ?? '');
     final sku = TextEditingController(text: existing?.sku ?? '');
     final barcode = TextEditingController(text: existing?.barcode ?? '');
-    final cost = TextEditingController(text: (existing?.cost ?? 0).toStringAsFixed(2));
-    final price = TextEditingController(text: (existing?.price ?? 0).toStringAsFixed(2));
+    final cost = TextEditingController(
+      text: existing == null
+          ? '0.00'
+          : (currency == 'LBP' ? existingCostDisplay.toStringAsFixed(0) : existingCostDisplay.toStringAsFixed(2)),
+    );
+    final price = TextEditingController(
+      text: existing == null
+          ? '0.00'
+          : (currency == 'LBP' ? existingPriceDisplay.toStringAsFixed(0) : existingPriceDisplay.toStringAsFixed(2)),
+    );
     final stock = TextEditingController(text: '${existing?.stockQty ?? 0}');
     final low = TextEditingController(text: '${existing?.lowStockThreshold ?? 5}');
     final unit = TextEditingController(text: existing?.unit ?? 'piece');
@@ -447,9 +467,21 @@ class _ProductsView extends StatelessWidget {
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
-                        Expanded(child: AppTextField(controller: cost, label: 'Cost', keyboardType: TextInputType.number)),
+                        Expanded(
+                          child: AppTextField(
+                            controller: cost,
+                            label: 'Cost ($currency)',
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
                         const SizedBox(width: AppSpacing.sm),
-                        Expanded(child: AppTextField(controller: price, label: 'Price', keyboardType: TextInputType.number)),
+                        Expanded(
+                          child: AppTextField(
+                            controller: price,
+                            label: 'Price ($currency)',
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -478,14 +510,27 @@ class _ProductsView extends StatelessWidget {
                     PrimaryButton(
                       label: context.l10n.tr('save'),
                       onPressed: () async {
+                        final enteredCost = double.tryParse(cost.text.trim()) ?? 0;
+                        final enteredPrice = double.tryParse(price.text.trim()) ?? 0;
+                        // نحوّل المدخل من العملة الحالية للدولار قبل التخزين
+                        final costInUsd = AppFormatters.toUsd(
+                          enteredCost,
+                          currency: currency,
+                          exchangeRate: exchangeRate,
+                        );
+                        final priceInUsd = AppFormatters.toUsd(
+                          enteredPrice,
+                          currency: currency,
+                          exchangeRate: exchangeRate,
+                        );
                         final input = ProductUpsertInput(
                           id: existing?.id,
                           name: name.text.trim(),
                           sku: sku.text.trim(),
                           barcode: barcode.text.trim().isEmpty ? null : barcode.text.trim(),
                           categoryId: categoryId,
-                          cost: double.tryParse(cost.text.trim()) ?? 0,
-                          price: double.tryParse(price.text.trim()) ?? 0,
+                          cost: costInUsd,
+                          price: priceInUsd,
                           stockQty: int.tryParse(stock.text.trim()) ?? 0,
                           lowStockThreshold: int.tryParse(low.text.trim()) ?? 5,
                           unit: unit.text.trim().isEmpty ? 'piece' : unit.text.trim(),
@@ -614,6 +659,7 @@ class _ProductListTile extends StatelessWidget {
   const _ProductListTile({
     required this.product,
     required this.currency,
+    required this.exchangeRate,
     required this.isAdmin,
     required this.onEdit,
     required this.onStockAction,
@@ -621,6 +667,7 @@ class _ProductListTile extends StatelessWidget {
 
   final ProductView product;
   final String currency;
+  final double exchangeRate;
   final bool isAdmin;
   final VoidCallback onEdit;
   final VoidCallback onStockAction;
@@ -636,7 +683,7 @@ class _ProductListTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(AppFormatters.money(product.price, currency: currency)),
+            Text(AppFormatters.money(product.price, currency: currency, exchangeRate: exchangeRate)),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
