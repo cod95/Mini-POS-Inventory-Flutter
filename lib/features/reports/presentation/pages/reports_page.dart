@@ -6,6 +6,7 @@ import '../../../../app/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/models/app_models.dart';
+import '../../../../core/state/app_cubit.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/cards.dart';
 import '../../../../core/widgets/states.dart';
@@ -34,6 +35,9 @@ class _ReportsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final settings = context.watch<AppCubit>().state.settings;
+    final currency = settings.currency;
+    final exchangeRate = settings.exchangeRate;
 
     return BlocBuilder<ReportsCubit, ReportsState>(
       builder: (context, state) {
@@ -71,7 +75,11 @@ class _ReportsView extends StatelessWidget {
                       width: 230,
                       child: SummaryCard(
                         title: 'Today sales',
-                        value: AppFormatters.money(state.dashboard.todaySales),
+                        value: AppFormatters.money(
+                          state.dashboard.todaySales,
+                          currency: currency,
+                          exchangeRate: exchangeRate,
+                        ),
                         subtitle: '${state.dashboard.todayInvoices} invoices',
                         icon: Icons.today,
                       ),
@@ -80,7 +88,11 @@ class _ReportsView extends StatelessWidget {
                       width: 230,
                       child: SummaryCard(
                         title: 'Month sales',
-                        value: AppFormatters.money(state.dashboard.monthSales),
+                        value: AppFormatters.money(
+                          state.dashboard.monthSales,
+                          currency: currency,
+                          exchangeRate: exchangeRate,
+                        ),
                         subtitle: '${state.dashboard.monthInvoices} invoices',
                         icon: Icons.calendar_month,
                       ),
@@ -89,7 +101,11 @@ class _ReportsView extends StatelessWidget {
                       width: 230,
                       child: SummaryCard(
                         title: 'Today profit',
-                        value: AppFormatters.money(state.dashboard.todayProfit),
+                        value: AppFormatters.money(
+                          state.dashboard.todayProfit,
+                          currency: currency,
+                          exchangeRate: exchangeRate,
+                        ),
                         icon: Icons.trending_up,
                         color: Colors.green,
                       ),
@@ -98,7 +114,11 @@ class _ReportsView extends StatelessWidget {
                       width: 230,
                       child: SummaryCard(
                         title: 'Month profit',
-                        value: AppFormatters.money(state.dashboard.monthProfit),
+                        value: AppFormatters.money(
+                          state.dashboard.monthProfit,
+                          currency: currency,
+                          exchangeRate: exchangeRate,
+                        ),
                         icon: Icons.insights,
                         color: Colors.green,
                       ),
@@ -144,11 +164,11 @@ class _ReportsView extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 _BestSellersCard(state: state),
                 const SizedBox(height: AppSpacing.md),
-                _SalesByProductCard(state: state),
+                _SalesByProductCard(state: state, currency: currency, exchangeRate: exchangeRate),
                 const SizedBox(height: AppSpacing.md),
                 _LowStockCard(state: state),
                 const SizedBox(height: AppSpacing.md),
-                _InvoiceHistoryCard(state: state),
+                _InvoiceHistoryCard(state: state, currency: currency, exchangeRate: exchangeRate),
                 if (state.error != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
@@ -252,9 +272,15 @@ class _BestSellersCard extends StatelessWidget {
 }
 
 class _SalesByProductCard extends StatelessWidget {
-  const _SalesByProductCard({required this.state});
+  const _SalesByProductCard({
+    required this.state,
+    required this.currency,
+    required this.exchangeRate,
+  });
 
   final ReportsState state;
+  final String currency;
+  final double exchangeRate;
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +310,9 @@ class _SalesByProductCard extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(child: Text(row.productName)),
-                          Text('${row.qty} pcs • ${AppFormatters.money(row.total)}'),
+                          Text(
+                            '${row.qty} pcs • ${AppFormatters.money(row.total, currency: currency, exchangeRate: exchangeRate)}',
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -338,9 +366,15 @@ class _LowStockCard extends StatelessWidget {
 }
 
 class _InvoiceHistoryCard extends StatelessWidget {
-  const _InvoiceHistoryCard({required this.state});
+  const _InvoiceHistoryCard({
+    required this.state,
+    required this.currency,
+    required this.exchangeRate,
+  });
 
   final ReportsState state;
+  final String currency;
+  final double exchangeRate;
 
   Color _statusColor(SaleStatus status) {
     switch (status) {
@@ -373,7 +407,7 @@ class _InvoiceHistoryCard extends StatelessWidget {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(AppFormatters.money(invoice.total)),
+                      Text(AppFormatters.money(invoice.total, currency: currency, exchangeRate: exchangeRate)),
                       const SizedBox(width: AppSpacing.sm),
                       StatusChip(label: invoice.status.value, color: _statusColor(invoice.status)),
                     ],
