@@ -37,7 +37,7 @@ class _MiniPosRootState extends State<MiniPosRoot> {
           builder: (context, state) {
             final locale = Locale(state.settings.language);
             return MaterialApp.router(
-              title: 'Mini POS + Inventory',
+              onGenerateTitle: (context) => AppLocalizations.of(context).tr('appTitle'),
               debugShowCheckedModeBanner: false,
               theme: AppTheme.light(),
               locale: locale,

@@ -306,7 +306,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     AppDropdown<PaymentMethod>(
-                      label: 'Payment',
+                      label: sheetContext.l10n.tr('fieldPayment'),
                       value: method,
                       items: PaymentMethod.values
                           .map(

@@ -74,33 +74,33 @@ class _ReportsView extends StatelessWidget {
                     SizedBox(
                       width: 230,
                       child: SummaryCard(
-                        title: 'Today sales',
+                        title: context.l10n.tr('todaySales'),
                         value: AppFormatters.money(
                           state.dashboard.todaySales,
                           currency: currency,
                           exchangeRate: exchangeRate,
                         ),
-                        subtitle: '${state.dashboard.todayInvoices} invoices',
+                        subtitle: '${state.dashboard.todayInvoices} ${context.l10n.tr('invoicesWord')}',
                         icon: Icons.today,
                       ),
                     ),
                     SizedBox(
                       width: 230,
                       child: SummaryCard(
-                        title: 'Month sales',
+                        title: context.l10n.tr('monthSales'),
                         value: AppFormatters.money(
                           state.dashboard.monthSales,
                           currency: currency,
                           exchangeRate: exchangeRate,
                         ),
-                        subtitle: '${state.dashboard.monthInvoices} invoices',
+                        subtitle: '${state.dashboard.monthInvoices} ${context.l10n.tr('invoicesWord')}',
                         icon: Icons.calendar_month,
                       ),
                     ),
                     SizedBox(
                       width: 230,
                       child: SummaryCard(
-                        title: 'Today profit',
+                        title: context.l10n.tr('todayProfit'),
                         value: AppFormatters.money(
                           state.dashboard.todayProfit,
                           currency: currency,
@@ -113,7 +113,7 @@ class _ReportsView extends StatelessWidget {
                     SizedBox(
                       width: 230,
                       child: SummaryCard(
-                        title: 'Month profit',
+                        title: context.l10n.tr('monthProfit'),
                         value: AppFormatters.money(
                           state.dashboard.monthProfit,
                           currency: currency,

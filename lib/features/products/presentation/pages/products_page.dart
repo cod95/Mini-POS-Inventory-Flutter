@@ -457,7 +457,7 @@ class _ProductsView extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
-                              'Tap to pick',
+                              context.l10n.tr('tapToPick'),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
@@ -470,7 +470,7 @@ class _ProductsView extends StatelessWidget {
                             children: [
                               AppTextField(
                                 controller: imageUrlController,
-                                label: 'Image URL (https://...)',
+                                label: context.l10n.tr('fieldImageUrl'),
                                 onChanged: (url) {
                                   final trimmed = url.trim();
                                   if (trimmed.startsWith('http')) {
@@ -490,14 +490,14 @@ class _ProductsView extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.md),
 
-                    AppTextField(controller: name, label: 'Name'),
+                    AppTextField(controller: name, label: context.l10n.tr('fieldName')),
                     const SizedBox(height: AppSpacing.sm),
-                    AppTextField(controller: sku, label: 'SKU'),
+                    AppTextField(controller: sku, label: context.l10n.tr('fieldSku')),
                     const SizedBox(height: AppSpacing.sm),
-                    AppTextField(controller: barcode, label: 'Barcode'),
+                    AppTextField(controller: barcode, label: context.l10n.tr('fieldBarcode')),
                     const SizedBox(height: AppSpacing.sm),
                     AppDropdown<int?>(
-                      label: 'Category',
+                      label: context.l10n.tr('fieldCategory'),
                       value: categoryId,
                       items: [
                         DropdownMenuItem<int?>(value: null, child: Text(context.l10n.tr('noCategory'))),
@@ -512,7 +512,7 @@ class _ProductsView extends StatelessWidget {
                         Expanded(
                           child: AppTextField(
                             controller: cost,
-                            label: 'Cost ($currency)',
+                            label: '${context.l10n.tr('fieldCost')} ($currency)',
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -520,7 +520,7 @@ class _ProductsView extends StatelessWidget {
                         Expanded(
                           child: AppTextField(
                             controller: price,
-                            label: 'Price ($currency)',
+                            label: '${context.l10n.tr('fieldPrice')} ($currency)',
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -529,12 +529,12 @@ class _ProductsView extends StatelessWidget {
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
-                        Expanded(child: AppTextField(controller: stock, label: 'Stock', keyboardType: TextInputType.number)),
+                        Expanded(child: AppTextField(controller: stock, label: context.l10n.tr('fieldStock'), keyboardType: TextInputType.number)),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: AppTextField(
                             controller: low,
-                            label: 'Low stock threshold',
+                            label: context.l10n.tr('fieldLowStockThreshold'),
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -543,9 +543,9 @@ class _ProductsView extends StatelessWidget {
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
-                        Expanded(child: AppTextField(controller: unit, label: 'Unit (piece/kg)')),
+                        Expanded(child: AppTextField(controller: unit, label: context.l10n.tr('fieldUnit'))),
                         const SizedBox(width: AppSpacing.sm),
-                        Expanded(child: AppTextField(controller: notes, label: 'Notes')),
+                        Expanded(child: AppTextField(controller: notes, label: context.l10n.tr('fieldNotes'))),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -619,7 +619,7 @@ class _ProductsView extends StatelessWidget {
                   Text('${context.l10n.tr('stockAction')} • ${product.name}'),
                   const SizedBox(height: AppSpacing.md),
                   AppDropdown<StockMovementType>(
-                    label: 'Action',
+                    label: context.l10n.tr('fieldAction'),
                     value: type,
                     items: StockMovementType.values
                         .where((e) => e != StockMovementType.sale && e != StockMovementType.returnSale)
@@ -630,9 +630,9 @@ class _ProductsView extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  AppTextField(controller: qty, label: 'Quantity', keyboardType: TextInputType.number),
+                  AppTextField(controller: qty, label: context.l10n.tr('fieldQuantity'), keyboardType: TextInputType.number),
                   const SizedBox(height: AppSpacing.sm),
-                  AppTextField(controller: reason, label: 'Reason'),
+                  AppTextField(controller: reason, label: context.l10n.tr('fieldReason')),
                   const SizedBox(height: AppSpacing.lg),
                   PrimaryButton(
                     label: context.l10n.tr('save'),
