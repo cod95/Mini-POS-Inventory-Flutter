@@ -186,6 +186,7 @@ class _ProductsView extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       builder: (sheetContext) {
         return Padding(
           padding: EdgeInsets.only(
@@ -322,6 +323,7 @@ class _ProductsView extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       builder: (context) {
         return Padding(
           padding: EdgeInsets.only(
@@ -559,6 +561,7 @@ class _ProductsView extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       builder: (context) {
         return Padding(
           padding: EdgeInsets.only(
