@@ -132,7 +132,7 @@ class _ReportsView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Exports', style: Theme.of(context).textTheme.titleMedium),
+                        Text(context.l10n.tr('exports'), style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: AppSpacing.sm),
                         Row(
                           children: [
@@ -203,7 +203,7 @@ class _RangeCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Row(
           children: [
-            Expanded(child: Text('Range: $label')),
+            Expanded(child: Text('${context.l10n.tr('range')}: $label')),
             OutlinedButton.icon(
               onPressed: () async {
                 final now = DateTime.now();
@@ -224,12 +224,12 @@ class _RangeCard extends StatelessWidget {
                 }
               },
               icon: const Icon(Icons.date_range_outlined),
-              label: const Text('Pick'),
+              label: Text(context.l10n.tr('pick')),
             ),
             const SizedBox(width: AppSpacing.sm),
             TextButton(
               onPressed: () => context.read<ReportsCubit>().setRange(null, null),
-              child: const Text('Reset'),
+              child: Text(context.l10n.tr('reset')),
             ),
           ],
         ),
@@ -251,7 +251,7 @@ class _BestSellersCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Best sellers', style: Theme.of(context).textTheme.titleMedium),
+            Text(context.l10n.tr('bestSellers'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             if (state.dashboard.bestSellers.isEmpty)
               const EmptyState(message: 'No sales yet')
@@ -296,7 +296,7 @@ class _SalesByProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Sales by product', style: Theme.of(context).textTheme.titleMedium),
+            Text(context.l10n.tr('salesByProduct'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             if (state.salesByProduct.isEmpty)
               const EmptyState(message: 'No product sales in selected range')
@@ -341,7 +341,7 @@ class _LowStockCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Low stock', style: Theme.of(context).textTheme.titleMedium),
+            Text(context.l10n.tr('lowStock'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             if (state.lowStockProducts.isEmpty)
               const EmptyState(message: 'All products are healthy')

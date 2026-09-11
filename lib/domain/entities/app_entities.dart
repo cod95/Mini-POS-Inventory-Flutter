@@ -96,6 +96,7 @@ class SaleView extends Equatable {
     required this.invoiceNo,
     required this.createdAt,
     required this.customerId,
+    this.customerName,
     required this.subtotal,
     required this.discountTotal,
     required this.taxTotal,
@@ -112,6 +113,7 @@ class SaleView extends Equatable {
   final String invoiceNo;
   final DateTime createdAt;
   final int? customerId;
+  final String? customerName;
   final double subtotal;
   final double discountTotal;
   final double taxTotal;
@@ -129,6 +131,7 @@ class SaleView extends Equatable {
         invoiceNo,
         createdAt,
         customerId,
+        customerName,
         subtotal,
         discountTotal,
         taxTotal,

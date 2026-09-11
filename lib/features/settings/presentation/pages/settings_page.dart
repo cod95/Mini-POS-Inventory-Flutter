@@ -19,6 +19,7 @@ class _SettingsPageState extends State<SettingsPage> {
   static const List<String> _supportedCurrencies = ['USD', 'LBP'];
 
   late final TextEditingController _storeNameController;
+  late final TextEditingController _storePhoneController;
   late final TextEditingController _exchangeRateController;
   late final TextEditingController _taxRateController;
   late final TextEditingController _receiptHeaderController;
@@ -35,6 +36,7 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _storeNameController = TextEditingController();
+    _storePhoneController = TextEditingController();
     _exchangeRateController = TextEditingController();
     _taxRateController = TextEditingController();
     _receiptHeaderController = TextEditingController();
@@ -46,6 +48,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void dispose() {
     _storeNameController.dispose();
+    _storePhoneController.dispose();
     _exchangeRateController.dispose();
     _taxRateController.dispose();
     _receiptHeaderController.dispose();
@@ -58,6 +61,7 @@ class _SettingsPageState extends State<SettingsPage> {
   void _syncControllers(AppSettingsModel settings) {
     if (_initialized) return;
     _storeNameController.text = settings.storeName;
+    _storePhoneController.text = settings.storePhone ?? '';
     _currency = _supportedCurrencies.contains(settings.currency) ? settings.currency : 'USD';
     _secondaryCurrency =
         _supportedCurrencies.contains(settings.secondaryCurrencyCode) ? settings.secondaryCurrencyCode : 'LBP';
@@ -106,6 +110,12 @@ class _SettingsPageState extends State<SettingsPage> {
                       Text(l10n.tr('storeSettings'), style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: AppSpacing.md),
                       AppTextField(controller: _storeNameController, label: l10n.tr('storeName')),
+                      const SizedBox(height: AppSpacing.sm),
+                      AppTextField(
+                        controller: _storePhoneController,
+                        label: l10n.tr('storePhone'),
+                        keyboardType: TextInputType.phone,
+                      ),
                       const SizedBox(height: AppSpacing.sm),
                       Row(
                         children: [
@@ -188,7 +198,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Receipt', style: Theme.of(context).textTheme.titleMedium),
+                      Text(context.l10n.tr('receipt'), style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: AppSpacing.md),
                       AppTextField(
                         controller: _receiptHeaderController,
@@ -212,7 +222,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Credentials', style: Theme.of(context).textTheme.titleMedium),
+                      Text(context.l10n.tr('credentials'), style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: AppSpacing.md),
                       AppTextField(
                         controller: _cashierPinController,
@@ -268,6 +278,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           storeName: _storeNameController.text.trim().isEmpty
                               ? settings.storeName
                               : _storeNameController.text.trim(),
+                          storePhone: _storePhoneController.text.trim(),
+                          clearStorePhone: _storePhoneController.text.trim().isEmpty,
                           currency: _currency,
                           secondaryCurrencyCode: _secondaryCurrency,
                           exchangeRate: double.tryParse(_exchangeRateController.text.trim()) ??

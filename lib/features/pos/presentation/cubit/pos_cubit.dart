@@ -22,6 +22,7 @@ class PosState extends Equatable {
     this.customers = const [],
     this.filter = const ProductFilter(),
     this.selectedCustomerId,
+    this.customerName,
     this.paymentMethod = PaymentMethod.cash,
     this.orderDiscount = 0,
     this.taxEnabled = false,
@@ -42,6 +43,7 @@ class PosState extends Equatable {
   final List<CustomerModel> customers;
   final ProductFilter filter;
   final int? selectedCustomerId;
+  final String? customerName;
   final PaymentMethod paymentMethod;
   final double orderDiscount;
   final bool taxEnabled;
@@ -86,6 +88,8 @@ class PosState extends Equatable {
     ProductFilter? filter,
     int? selectedCustomerId,
     bool clearCustomer = false,
+    String? customerName,
+    bool clearCustomerName = false,
     PaymentMethod? paymentMethod,
     double? orderDiscount,
     bool? taxEnabled,
@@ -108,6 +112,7 @@ class PosState extends Equatable {
       customers: customers ?? this.customers,
       filter: filter ?? this.filter,
       selectedCustomerId: clearCustomer ? null : selectedCustomerId ?? this.selectedCustomerId,
+      customerName: clearCustomerName ? null : customerName ?? this.customerName,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       orderDiscount: orderDiscount ?? this.orderDiscount,
       taxEnabled: taxEnabled ?? this.taxEnabled,
@@ -131,6 +136,7 @@ class PosState extends Equatable {
         customers,
         filter,
         selectedCustomerId,
+        customerName,
         paymentMethod,
         orderDiscount,
         taxEnabled,
@@ -295,6 +301,9 @@ class PosCubit extends Cubit<PosState> {
 
   void selectCustomer(int? id) => emit(state.copyWith(selectedCustomerId: id, clearCustomer: id == null));
 
+  void setCustomerName(String value) =>
+      emit(state.copyWith(customerName: value, clearCustomerName: value.trim().isEmpty));
+
   Future<void> checkout() async {
     if (state.cart.isEmpty) {
       emit(state.copyWith(error: 'Cart is empty'));
@@ -312,6 +321,7 @@ class PosCubit extends Cubit<PosState> {
           paid: state.paid,
           paymentMethod: state.paymentMethod,
           customerId: state.selectedCustomerId,
+          customerName: state.customerName,
         ),
       );
 
@@ -322,6 +332,7 @@ class PosCubit extends Cubit<PosState> {
           cart: const [],
           orderDiscount: 0,
           paid: 0,
+          clearCustomerName: true,
           infoMessage: 'Sale completed: ${result.invoiceNo}',
         ),
       );
@@ -373,9 +384,13 @@ class PosCubit extends Cubit<PosState> {
         sale: detail.sale,
         items: detail.items,
         storeName: settings.storeName,
+        storePhone: settings.storePhone,
         header: settings.receiptHeader,
         footer: settings.receiptFooter,
         currency: settings.currency,
+        exchangeRate: settings.exchangeRate,
+        taxEnabled: settings.taxEnabled,
+        languageCode: settings.language,
       );
       if (share) {
         await _receiptPdfService.sharePdf(file);

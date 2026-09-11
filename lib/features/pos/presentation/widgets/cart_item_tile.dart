@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/models/app_models.dart';
 import '../../../../core/utils/formatters.dart';
 
@@ -72,18 +73,18 @@ class CartItemTile extends StatelessWidget {
                   TextButton.icon(
                     onPressed: () => _showAmountDialog(
                       context,
-                      title: 'Item discount',
+                      title: context.l10n.tr('itemDiscount'),
                       initial: item.discount,
                       onSubmit: onDiscountEdit,
                     ),
                     icon: const Icon(Icons.discount_outlined),
-                    label: Text('Disc ${item.discount.toStringAsFixed(2)}'),
+                    label: Text('${context.l10n.tr('discount')} ${item.discount.toStringAsFixed(2)}'),
                   ),
                   if (canEditPrice)
                     TextButton.icon(
                       onPressed: () => _showAmountDialog(
                         context,
-                        title: 'Edit item price',
+                        title: context.l10n.tr('editItemPrice'),
                         initial: item.price,
                         onSubmit: onPriceEdit,
                       ),
@@ -117,10 +118,10 @@ class CartItemTile extends StatelessWidget {
             autofocus: true,
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(context.l10n.tr('cancel'))),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(double.tryParse(controller.text.trim()) ?? initial),
-              child: const Text('Save'),
+              child: Text(context.l10n.tr('save')),
             ),
           ],
         );

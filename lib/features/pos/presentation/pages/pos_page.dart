@@ -80,7 +80,7 @@ class _PosView extends StatelessWidget {
                     scrollDirection: Axis.horizontal,
                     children: [
                       FilterChip(
-                        label: const Text('All'),
+                        label: Text(context.l10n.tr('all')),
                         selected: state.filter.categoryId == null,
                         onSelected: (_) => context.read<PosCubit>().updateFilter(categoryId: -1),
                       ),
@@ -264,6 +264,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
   Future<void> _openCheckoutSheet(BuildContext context, PosState state) async {
     final cubit = context.read<PosCubit>();
     final discountController = TextEditingController(text: state.orderDiscount.toStringAsFixed(2));
+    final customerNameController = TextEditingController(text: state.customerName ?? '');
     final paidController = TextEditingController(
       text: (state.paid > 0 ? state.paid : state.total).toStringAsFixed(2),
     );
@@ -289,10 +290,15 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Checkout details',
+                      sheetContext.l10n.tr('paymentDetails'),
                       style: Theme.of(sheetContext).textTheme.titleLarge,
                     ),
                     const SizedBox(height: AppSpacing.md),
+                    AppTextField(
+                      controller: customerNameController,
+                      label: sheetContext.l10n.tr('customerName'),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
                     AmountField(
                       controller: discountController,
                       label: sheetContext.l10n.tr('orderDiscount'),
@@ -353,6 +359,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                       icon: Icons.check_circle_outline,
                       minHeight: 52,
                       onPressed: () async {
+                        cubit.setCustomerName(customerNameController.text);
                         cubit.setOrderDiscount(double.tryParse(discountController.text) ?? 0);
                         cubit.setPaymentMethod(method);
                         cubit.setPaid(double.tryParse(paidController.text) ?? 0);
@@ -372,6 +379,7 @@ class _CheckoutBarState extends State<_CheckoutBar> {
     );
 
     discountController.dispose();
+    customerNameController.dispose();
     paidController.dispose();
   }
 

@@ -3,9 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/models/app_models.dart';
+import '../../../../core/state/app_cubit.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../core/widgets/cards.dart';
 import '../../../../core/widgets/states.dart';
 import '../cubit/invoice_detail_cubit.dart';
 
@@ -29,6 +30,9 @@ class _InvoiceDetailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final settings = context.watch<AppCubit>().state.settings;
+
     return BlocBuilder<InvoiceDetailCubit, InvoiceDetailState>(
       builder: (context, state) {
         if (state.loading && state.detail == null) {
@@ -43,34 +47,60 @@ class _InvoiceDetailView extends StatelessWidget {
         final detail = state.detail;
         if (detail == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Invoice details')),
-            body: EmptyState(message: state.error ?? 'Invoice not found'),
+            appBar: AppBar(title: Text(l10n.tr('invoiceDetails'))),
+            body: EmptyState(message: state.error ?? l10n.tr('invoiceNotFound')),
           );
         }
 
         final sale = detail.sale;
+        final customerLabel = (sale.customerName == null || sale.customerName!.trim().isEmpty)
+            ? l10n.tr('noName')
+            : sale.customerName!.trim();
+        final preTaxTotal = sale.total - sale.taxTotal;
+        final itemCount = detail.items.fold<int>(0, (sum, item) => sum + item.qty);
 
         return Scaffold(
-          appBar: AppBar(title: Text(sale.invoiceNo)),
+          appBar: AppBar(title: Text(settings.storeName)),
           body: ListView(
             padding: const EdgeInsets.all(AppSpacing.lg),
             children: [
-              SummaryCard(
-                title: 'Invoice summary',
-                value: AppFormatters.money(sale.total),
-                subtitle:
-                    '${AppFormatters.shortDate(sale.createdAt)} • ${sale.paymentMethod.value.toUpperCase()}',
-                icon: Icons.receipt_long,
-              ),
+              // Invoice number + date + customer name.
+              Text('${l10n.tr('invoiceNumber')}: ${sale.invoiceNo}',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.xs),
+              Text(AppFormatters.shortDate(sale.createdAt),
+                  style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: AppSpacing.xs),
+              Text('${l10n.tr('customerName')}: $customerLabel'),
               const SizedBox(height: AppSpacing.md),
+              // Items table: item | qty | price | total
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Items', style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Text(l10n.tr('item'), style: Theme.of(context).textTheme.labelLarge),
+                          ),
+                          Expanded(
+                            child: Text(l10n.tr('qty'),
+                                style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center),
+                          ),
+                          Expanded(
+                            child: Text(l10n.tr('price'),
+                                style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.end),
+                          ),
+                          Expanded(
+                            child: Text(l10n.tr('total'),
+                                style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.end),
+                          ),
+                        ],
+                      ),
+                      const Divider(),
                       ...detail.items.map(
                         (item) {
                           final canReturnThis = sale.status == SaleStatus.completed;
@@ -79,92 +109,82 @@ class _InvoiceDetailView extends StatelessWidget {
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                            child: Container(
-                              padding: const EdgeInsets.all(AppSpacing.sm),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.outlineVariant,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(flex: 3, child: Text(item.nameSnapshot)),
+                                    Expanded(
+                                      child: Text('${item.qty}', textAlign: TextAlign.center),
+                                    ),
+                                    Expanded(
+                                      child: Text(item.priceSnapshot.toStringAsFixed(2),
+                                          textAlign: TextAlign.end),
+                                    ),
+                                    Expanded(
+                                      child: Text(item.lineTotal.toStringAsFixed(2),
+                                          textAlign: TextAlign.end),
+                                    ),
+                                  ],
                                 ),
-                                borderRadius: AppRadii.md,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
+                                if (canReturnThis) ...[
+                                  const SizedBox(height: AppSpacing.xs),
                                   Row(
                                     children: [
-                                      Expanded(
-                                        child: Text(
-                                          item.nameSnapshot,
-                                          style: Theme.of(context).textTheme.titleSmall,
-                                        ),
+                                      Text('${l10n.tr('returnQty')} ($maxQty):'),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      IconButton.filledTonal(
+                                        onPressed: returnQty <= 0
+                                            ? null
+                                            : () => context
+                                                .read<InvoiceDetailCubit>()
+                                                .setReturnQty(item.id, returnQty - 1),
+                                        icon: const Icon(Icons.remove),
                                       ),
-                                      StatusChip(
-                                        label:
-                                            'x${item.qty} • ${AppFormatters.money(item.lineTotal)}',
-                                        color: Colors.blue,
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Text('$returnQty', style: Theme.of(context).textTheme.titleMedium),
+                                      const SizedBox(width: AppSpacing.xs),
+                                      IconButton.filled(
+                                        onPressed: returnQty >= maxQty
+                                            ? null
+                                            : () => context
+                                                .read<InvoiceDetailCubit>()
+                                                .setReturnQty(item.id, returnQty + 1),
+                                        icon: const Icon(Icons.add),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text(
-                                    'Price ${AppFormatters.money(item.priceSnapshot)}  |  Cost ${AppFormatters.money(item.costSnapshot)}  |  Discount ${AppFormatters.money(item.discount)}',
-                                  ),
-                                  if (canReturnThis) ...[
-                                    const SizedBox(height: AppSpacing.sm),
-                                    Row(
-                                      children: [
-                                        Text('Return qty (max $maxQty):'),
-                                        const SizedBox(width: AppSpacing.sm),
-                                        IconButton.filledTonal(
-                                          onPressed: returnQty <= 0
-                                              ? null
-                                              : () => context
-                                                  .read<InvoiceDetailCubit>()
-                                                  .setReturnQty(item.id, returnQty - 1),
-                                          icon: const Icon(Icons.remove),
-                                        ),
-                                        const SizedBox(width: AppSpacing.xs),
-                                        Text(
-                                          '$returnQty',
-                                          style: Theme.of(context).textTheme.titleMedium,
-                                        ),
-                                        const SizedBox(width: AppSpacing.xs),
-                                        IconButton.filled(
-                                          onPressed: returnQty >= maxQty
-                                              ? null
-                                              : () => context
-                                                  .read<InvoiceDetailCubit>()
-                                                  .setReturnQty(item.id, returnQty + 1),
-                                          icon: const Icon(Icons.add),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
                                 ],
-                              ),
+                              ],
                             ),
                           );
                         },
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Totals', style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: AppSpacing.sm),
-                      _line('Subtotal', sale.subtotal),
-                      _line('Discount', sale.discountTotal),
-                      _line('Tax', sale.taxTotal),
-                      _line('Total', sale.total, bold: true),
-                      _line('Paid', sale.paid),
-                      _line('Change', sale.changeAmount),
+                      const Divider(),
+                      // Totals: USD, LBP, after-TVA (if applicable), item count.
+                      _totalLine(
+                        context,
+                        l10n.tr('totalUsd'),
+                        AppFormatters.money(preTaxTotal, currency: 'USD'),
+                      ),
+                      _totalLine(
+                        context,
+                        l10n.tr('totalLbp'),
+                        AppFormatters.money(
+                          preTaxTotal,
+                          currency: 'LBP',
+                          exchangeRate: settings.exchangeRate,
+                        ),
+                      ),
+                      if (settings.taxEnabled)
+                        _totalLine(
+                          context,
+                          l10n.tr('totalAfterTax'),
+                          AppFormatters.money(sale.total, currency: 'USD'),
+                          bold: true,
+                        ),
+                      _totalLine(context, l10n.tr('itemCount'), '$itemCount'),
                     ],
                   ),
                 ),
@@ -175,12 +195,12 @@ class _InvoiceDetailView extends StatelessWidget {
                     ? () => context.read<InvoiceDetailCubit>().submitReturn()
                     : null,
                 icon: const Icon(Icons.undo),
-                label: Text(state.returning ? 'Processing return...' : 'Return selected items'),
+                label: Text(state.returning ? l10n.tr('processingReturn') : l10n.tr('returnSelectedItems')),
               ),
               if (state.lastReturnInvoice != null) ...[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'Return created: ${state.lastReturnInvoice}',
+                  '${l10n.tr('returnCreated')}: ${state.lastReturnInvoice}',
                   style: TextStyle(color: Theme.of(context).colorScheme.primary),
                 ),
               ],
@@ -198,14 +218,14 @@ class _InvoiceDetailView extends StatelessWidget {
     );
   }
 
-  Widget _line(String label, double value, {bool bold = false}) {
+  Widget _totalLine(BuildContext context, String label, String value, {bool bold = false}) {
     final textStyle = TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.w400);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: textStyle)),
-          Text(AppFormatters.money(value), style: textStyle),
+          Expanded(child: Text('$label:', style: textStyle)),
+          Text(value, style: textStyle),
         ],
       ),
     );

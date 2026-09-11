@@ -134,6 +134,11 @@ class Sales extends Table {
   /// currency, snapshotted at checkout time so old receipts stay correct
   /// even if the rate is changed later in Settings.
   RealColumn get exchangeRateAtSale => real().withDefault(const Constant(89000))();
+
+  /// Free-text customer/client name typed at checkout, shown on the invoice.
+  /// Independent of [customerId] (which is only used for the credit/balance
+  /// ledger) — most walk-in sales will leave this blank.
+  TextColumn get customerName => text().nullable()();
 }
 
 class SaleItems extends Table {
@@ -161,6 +166,9 @@ class AppSettings extends Table {
   IntColumn get id => integer()();
 
   TextColumn get storeName => text().withDefault(const Constant('Mini Store'))();
+
+  /// Shown under the store name (settings + receipt).
+  TextColumn get storePhone => text().nullable()();
 
   /// The main currency products are priced in and sold with (e.g. 'USD').
   TextColumn get currency => text().withDefault(const Constant('USD'))();
@@ -212,7 +220,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -226,6 +234,10 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(appSettings, appSettings.exchangeRate);
             await m.addColumn(sales, sales.secondaryCurrencyCode);
             await m.addColumn(sales, sales.exchangeRateAtSale);
+          }
+          if (from < 4) {
+            await m.addColumn(appSettings, appSettings.storePhone);
+            await m.addColumn(sales, sales.customerName);
           }
         },
       );

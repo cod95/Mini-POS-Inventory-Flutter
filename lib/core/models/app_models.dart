@@ -93,6 +93,7 @@ extension StockMovementTypeX on StockMovementType {
 class AppSettingsModel extends Equatable {
   const AppSettingsModel({
     required this.storeName,
+    this.storePhone,
     required this.currency,
     required this.secondaryCurrencyCode,
     required this.exchangeRate,
@@ -107,6 +108,7 @@ class AppSettingsModel extends Equatable {
   });
 
   final String storeName;
+  final String? storePhone;
   final String currency;
   final String secondaryCurrencyCode;
   final double exchangeRate;
@@ -121,6 +123,8 @@ class AppSettingsModel extends Equatable {
 
   AppSettingsModel copyWith({
     String? storeName,
+    String? storePhone,
+    bool clearStorePhone = false,
     String? currency,
     String? secondaryCurrencyCode,
     double? exchangeRate,
@@ -135,6 +139,7 @@ class AppSettingsModel extends Equatable {
   }) {
     return AppSettingsModel(
       storeName: storeName ?? this.storeName,
+      storePhone: clearStorePhone ? null : (storePhone ?? this.storePhone),
       currency: currency ?? this.currency,
       secondaryCurrencyCode: secondaryCurrencyCode ?? this.secondaryCurrencyCode,
       exchangeRate: exchangeRate ?? this.exchangeRate,
@@ -151,6 +156,7 @@ class AppSettingsModel extends Equatable {
 
   static const fallback = AppSettingsModel(
     storeName: 'Mini Store',
+    storePhone: null,
     currency: 'USD',
     secondaryCurrencyCode: 'LBP',
     exchangeRate: 89000,
@@ -167,6 +173,7 @@ class AppSettingsModel extends Equatable {
   @override
   List<Object?> get props => [
         storeName,
+        storePhone,
         currency,
         secondaryCurrencyCode,
         exchangeRate,
@@ -497,6 +504,7 @@ class SaleCheckoutInput extends Equatable {
     required this.paid,
     required this.paymentMethod,
     this.customerId,
+    this.customerName,
   });
 
   final List<CartItem> items;
@@ -506,6 +514,7 @@ class SaleCheckoutInput extends Equatable {
   final double paid;
   final PaymentMethod paymentMethod;
   final int? customerId;
+  final String? customerName;
 
   @override
   List<Object?> get props => [
@@ -516,5 +525,6 @@ class SaleCheckoutInput extends Equatable {
         paid,
         paymentMethod,
         customerId,
+        customerName,
       ];
 }

@@ -60,6 +60,7 @@ class LocalSettingsRepository implements SettingsRepository {
 
     return AppSettingsModel(
       storeName: row.storeName,
+      storePhone: row.storePhone,
       currency: row.currency,
       secondaryCurrencyCode: row.secondaryCurrencyCode,
       exchangeRate: row.exchangeRate,
@@ -80,6 +81,7 @@ class LocalSettingsRepository implements SettingsRepository {
           AppSettingsCompanion.insert(
             id: const Value(1),
             storeName: Value(settings.storeName),
+            storePhone: Value(settings.storePhone),
             currency: Value(settings.currency),
             secondaryCurrencyCode: Value(settings.secondaryCurrencyCode),
             exchangeRate: Value(settings.exchangeRate),
@@ -384,6 +386,11 @@ class LocalSalesRepository implements SalesRepository {
               invoiceNo: invoiceNo,
               createdAt: Value(now),
               customerId: Value(input.customerId),
+              customerName: Value(
+                (input.customerName == null || input.customerName!.trim().isEmpty)
+                    ? null
+                    : input.customerName!.trim(),
+              ),
               subtotal: subtotal,
               discountTotal: discountTotal,
               taxTotal: tax,
@@ -526,7 +533,7 @@ class LocalSalesRepository implements SalesRepository {
               invoiceNo: returnInvoice,
               createdAt: Value(now),
               customerId: Value(sale.customerId),
-              subtotal: 0,
+              customerName: Value(sale.customerName),
               discountTotal: 0,
               taxTotal: 0,
               total: 0,
@@ -630,6 +637,7 @@ class LocalSalesRepository implements SalesRepository {
       invoiceNo: sale.invoiceNo,
       createdAt: sale.createdAt,
       customerId: sale.customerId,
+      customerName: sale.customerName,
       subtotal: sale.subtotal,
       discountTotal: sale.discountTotal,
       taxTotal: sale.taxTotal,

@@ -73,7 +73,7 @@ class _ProductsView extends StatelessWidget {
                     scrollDirection: Axis.horizontal,
                     children: [
                       FilterChip(
-                        label: const Text('All'),
+                        label: Text(context.l10n.tr('all')),
                         selected: state.filter.categoryId == null,
                         onSelected: (_) => context.read<ProductsCubit>().applyFilter(categoryId: -1),
                       ),
@@ -139,7 +139,7 @@ class _ProductsView extends StatelessWidget {
                               context: context,
                               builder: (context) => AlertDialog(
                                 title: Text(l10n.tr('delete')),
-                                content: Text('Delete ${product.name}?'),
+                                content: Text('${context.l10n.tr('deleteProductConfirm')} ${product.name}?'),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.of(context).pop(false),
@@ -204,49 +204,89 @@ class _ProductsView extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('إدارة الأقسام', style: Theme.of(blocContext).textTheme.titleLarge),
+                      Text(blocContext.l10n.tr('manageCategories'), style: Theme.of(blocContext).textTheme.titleLarge),
                       const SizedBox(height: AppSpacing.md),
                       if (state.categories.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-                          child: Text('لا يوجد أقسام بعد'),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                          child: Text(blocContext.l10n.tr('noCategoriesYet')),
                         )
                       else
                         ...state.categories.map(
                           (c) => ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text(c.name),
-                            trailing: IconButton(
-                              icon: Icon(
-                                Icons.delete_outline,
-                                color: Theme.of(blocContext).colorScheme.error,
-                              ),
-                              onPressed: () async {
-                                final confirmed = await showDialog<bool>(
-                                  context: blocContext,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('حذف القسم'),
-                                    content: Text('هل تريد حذف "${c.name}"؟'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.of(ctx).pop(false),
-                                        child: const Text('إلغاء'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined),
+                                  onPressed: () async {
+                                    final renameController = TextEditingController(text: c.name);
+                                    final newName = await showDialog<String>(
+                                      context: blocContext,
+                                      builder: (ctx) => AlertDialog(
+                                        title: Text(blocContext.l10n.tr('renameCategory')),
+                                        content: AppTextField(
+                                          controller: renameController,
+                                          label: blocContext.l10n.tr('newName'),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(ctx).pop(),
+                                            child: Text(blocContext.l10n.tr('cancel')),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () => Navigator.of(ctx).pop(renameController.text),
+                                            child: Text(blocContext.l10n.tr('save')),
+                                          ),
+                                        ],
                                       ),
-                                      FilledButton(
-                                        onPressed: () => Navigator.of(ctx).pop(true),
-                                        child: const Text('حذف'),
-                                      ),
-                                    ],
+                                    );
+                                    if (newName == null || newName.trim().isEmpty || newName.trim() == c.name) {
+                                      return;
+                                    }
+                                    final error = await cubit.renameCategory(c.id, newName);
+                                    if (blocContext.mounted && error != null) {
+                                      ScaffoldMessenger.of(blocContext).showSnackBar(
+                                        SnackBar(content: Text(error)),
+                                      );
+                                    }
+                                  },
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    color: Theme.of(blocContext).colorScheme.error,
                                   ),
-                                );
-                                if (confirmed != true) return;
-                                final error = await cubit.deleteCategory(c.id);
-                                if (blocContext.mounted && error != null) {
-                                  ScaffoldMessenger.of(blocContext).showSnackBar(
-                                    SnackBar(content: Text(error)),
-                                  );
-                                }
-                              },
+                                  onPressed: () async {
+                                    final confirmed = await showDialog<bool>(
+                                      context: blocContext,
+                                      builder: (ctx) => AlertDialog(
+                                        title: Text(blocContext.l10n.tr('deleteCategoryConfirm')),
+                                        content: Text('${blocContext.l10n.tr('confirmDeleteCategoryQuestion')} "${c.name}"؟'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(ctx).pop(false),
+                                            child: Text(blocContext.l10n.tr('cancel')),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () => Navigator.of(ctx).pop(true),
+                                            child: Text(blocContext.l10n.tr('delete')),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirmed != true) return;
+                                    final error = await cubit.deleteCategory(c.id);
+                                    if (blocContext.mounted && error != null) {
+                                      ScaffoldMessenger.of(blocContext).showSnackBar(
+                                        SnackBar(content: Text(error)),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -256,7 +296,7 @@ class _ProductsView extends StatelessWidget {
                           Expanded(
                             child: AppTextField(
                               controller: newCategoryController,
-                              label: 'اسم القسم الجديد',
+                              label: blocContext.l10n.tr('newCategoryName'),
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
@@ -265,7 +305,7 @@ class _ProductsView extends StatelessWidget {
                               await cubit.saveCategory(newCategoryController.text);
                               newCategoryController.clear();
                             },
-                            child: const Text('إضافة'),
+                            child: Text(blocContext.l10n.tr('add')),
                           ),
                         ],
                       ),
@@ -373,7 +413,7 @@ class _ProductsView extends StatelessWidget {
                                     children: [
                                       ListTile(
                                         leading: const Icon(Icons.photo_library_outlined),
-                                        title: const Text('Choose from gallery'),
+                                        title: Text(context.l10n.tr('chooseFromGallery')),
                                         onTap: () {
                                           Navigator.of(ctx).pop();
                                           pickImage(ImageSource.gallery);
@@ -381,7 +421,7 @@ class _ProductsView extends StatelessWidget {
                                       ),
                                       ListTile(
                                         leading: const Icon(Icons.camera_alt_outlined),
-                                        title: const Text('Take a photo'),
+                                        title: Text(context.l10n.tr('takePhoto')),
                                         onTap: () {
                                           Navigator.of(ctx).pop();
                                           pickImage(ImageSource.camera);
@@ -390,7 +430,7 @@ class _ProductsView extends StatelessWidget {
                                       if (pickedImagePath != null)
                                         ListTile(
                                           leading: const Icon(Icons.delete_outline),
-                                          title: const Text('Remove image'),
+                                          title: Text(context.l10n.tr('removeImage')),
                                           onTap: () {
                                             Navigator.of(ctx).pop();
                                             setState(() {
@@ -460,7 +500,7 @@ class _ProductsView extends StatelessWidget {
                       label: 'Category',
                       value: categoryId,
                       items: [
-                        const DropdownMenuItem<int?>(value: null, child: Text('No category')),
+                        DropdownMenuItem<int?>(value: null, child: Text(context.l10n.tr('noCategory'))),
                         ...state.categories
                             .map((c) => DropdownMenuItem<int?>(value: c.id, child: Text(c.name))),
                       ],
@@ -576,7 +616,7 @@ class _ProductsView extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Stock action • ${product.name}'),
+                  Text('${context.l10n.tr('stockAction')} • ${product.name}'),
                   const SizedBox(height: AppSpacing.md),
                   AppDropdown<StockMovementType>(
                     label: 'Action',
@@ -696,7 +736,7 @@ class _ProductListTile extends StatelessWidget {
                     : Theme.of(context).colorScheme.secondaryContainer,
                 borderRadius: AppRadii.sm,
               ),
-              child: Text('Stock ${product.stockQty}'),
+              child: Text('${context.l10n.tr('stockLabel')} ${product.stockQty}'),
             ),
           ],
         ),

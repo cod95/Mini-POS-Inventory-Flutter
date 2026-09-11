@@ -112,6 +112,20 @@ class ProductsCubit extends Cubit<ProductsState> {
     await load();
   }
 
+  /// Renames an existing category.
+  Future<String?> renameCategory(int id, String newName) async {
+    if (newName.trim().isEmpty) return null;
+    try {
+      await _productRepository.updateCategory(CategoryModel(id: id, name: newName.trim()));
+      await load();
+      return null;
+    } on AppException catch (e) {
+      return e.message;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
   /// Deletes a category. Returns an error message if it can't be deleted
   /// (e.g. products still reference it), or null on success.
   Future<String?> deleteCategory(int id) async {
