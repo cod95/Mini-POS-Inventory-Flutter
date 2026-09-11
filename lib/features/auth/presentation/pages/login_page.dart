@@ -8,6 +8,9 @@ import '../../../../core/state/app_cubit.dart';
 import '../../../../core/widgets/buttons.dart';
 import '../../../../core/widgets/fields.dart';
 
+/// دخول لمستخدم واحد فقط: كلمة سر واحدة بتفتح كل التطبيق بصلاحية كاملة
+/// (ما في تفريق أدمن/كاشير بعد اليوم). كلمة السر تتغيّر من:
+/// الإعدادات -> Credentials -> "Admin password".
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -16,13 +19,11 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _pinController = TextEditingController(text: '1234');
-  final _adminController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _pinController.dispose();
-    _adminController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -56,32 +57,16 @@ class _LoginPageState extends State<LoginPage> {
                           Text(l10n.tr('login'), style: Theme.of(context).textTheme.titleMedium),
                           const SizedBox(height: AppSpacing.xl),
                           AppTextField(
-                            controller: _pinController,
-                            label: l10n.tr('pin'),
-                            keyboardType: TextInputType.number,
-                            obscureText: true,
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          PrimaryButton(
-                            label: l10n.tr('continueAsCashier'),
-                            onPressed: state.loading
-                                ? null
-                                : () => context.read<AppCubit>().loginCashier(_pinController.text.trim()),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          AppTextField(
-                            controller: _adminController,
+                            controller: _passwordController,
                             label: l10n.tr('adminPassword'),
                             obscureText: true,
                           ),
                           const SizedBox(height: AppSpacing.lg),
-                          OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                          PrimaryButton(
+                            label: l10n.tr('login'),
                             onPressed: state.loading
                                 ? null
-                                : () => context.read<AppCubit>().loginAdmin(_adminController.text.trim()),
-                            icon: const Icon(Icons.admin_panel_settings_outlined),
-                            label: Text(l10n.tr('continueAsAdmin')),
+                                : () => context.read<AppCubit>().loginAdmin(_passwordController.text.trim()),
                           ),
                           if (state.error != null) ...[
                             const SizedBox(height: AppSpacing.md),
