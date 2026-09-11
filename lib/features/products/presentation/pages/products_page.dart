@@ -185,95 +185,93 @@ class _ProductsView extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (sheetContext) {
         return Padding(
           padding: EdgeInsets.only(
             left: AppSpacing.lg,
             right: AppSpacing.lg,
             top: AppSpacing.lg,
-            bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + AppSpacing.lg,
           ),
-          child: StatefulBuilder(
-            builder: (context, setState) {
-              return BlocBuilder<ProductsCubit, ProductsState>(
-                bloc: cubit,
-                builder: (context, state) {
-                  return SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('إدارة الأقسام', style: Theme.of(context).textTheme.titleLarge),
-                        const SizedBox(height: AppSpacing.md),
-                        if (state.categories.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-                            child: Text('لا يوجد أقسام بعد'),
-                          )
-                        else
-                          ...state.categories.map(
-                            (c) => ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(c.name),
-                              trailing: IconButton(
-                                icon: Icon(
-                                  Icons.delete_outline,
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                                onPressed: () async {
-                                  final confirmed = await showDialog<bool>(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: const Text('حذف القسم'),
-                                      content: Text('هل تريد حذف "${c.name}"؟'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.of(ctx).pop(false),
-                                          child: const Text('إلغاء'),
-                                        ),
-                                        FilledButton(
-                                          onPressed: () => Navigator.of(ctx).pop(true),
-                                          child: const Text('حذف'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  if (confirmed != true) return;
-                                  final error = await cubit.deleteCategory(c.id);
-                                  if (context.mounted && error != null) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(error)),
-                                    );
-                                  }
-                                },
+          child: BlocProvider.value(
+            value: cubit,
+            child: BlocBuilder<ProductsCubit, ProductsState>(
+              builder: (blocContext, state) {
+                return SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('إدارة الأقسام', style: Theme.of(blocContext).textTheme.titleLarge),
+                      const SizedBox(height: AppSpacing.md),
+                      if (state.categories.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                          child: Text('لا يوجد أقسام بعد'),
+                        )
+                      else
+                        ...state.categories.map(
+                          (c) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(c.name),
+                            trailing: IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                color: Theme.of(blocContext).colorScheme.error,
                               ),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: blocContext,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('حذف القسم'),
+                                    content: Text('هل تريد حذف "${c.name}"؟'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(false),
+                                        child: const Text('إلغاء'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () => Navigator.of(ctx).pop(true),
+                                        child: const Text('حذف'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true) return;
+                                final error = await cubit.deleteCategory(c.id);
+                                if (blocContext.mounted && error != null) {
+                                  ScaffoldMessenger.of(blocContext).showSnackBar(
+                                    SnackBar(content: Text(error)),
+                                  );
+                                }
+                              },
                             ),
                           ),
-                        const SizedBox(height: AppSpacing.md),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: AppTextField(
-                                controller: newCategoryController,
-                                label: 'اسم القسم الجديد',
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            FilledButton(
-                              onPressed: () async {
-                                await cubit.saveCategory(newCategoryController.text);
-                                newCategoryController.clear();
-                              },
-                              child: const Text('إضافة'),
-                            ),
-                          ],
                         ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppTextField(
+                              controller: newCategoryController,
+                              label: 'اسم القسم الجديد',
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          FilledButton(
+                            onPressed: () async {
+                              await cubit.saveCategory(newCategoryController.text);
+                              newCategoryController.clear();
+                            },
+                            child: const Text('إضافة'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         );
       },
