@@ -534,6 +534,7 @@ class LocalSalesRepository implements SalesRepository {
               createdAt: Value(now),
               customerId: Value(sale.customerId),
               customerName: Value(sale.customerName),
+              subtotal: 0,
               discountTotal: 0,
               taxTotal: 0,
               total: 0,
