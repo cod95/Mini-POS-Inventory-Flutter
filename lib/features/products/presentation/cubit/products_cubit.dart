@@ -106,46 +106,19 @@ class ProductsCubit extends Cubit<ProductsState> {
     }
   }
 
-  /// Adds a new category. Returns an error message if it fails (e.g. a
-  /// category with that name already exists), or null on success.
-  Future<String?> saveCategory(String name) async {
-    final trimmed = name.trim();
-    if (trimmed.isEmpty) return null;
-    if (state.categories.any((c) => c.name.toLowerCase() == trimmed.toLowerCase())) {
-      return 'هذا القسم موجود مسبقًا';
-    }
-    try {
-      await _productRepository.addCategory(trimmed);
-      await load();
-      return null;
-    } on AppException catch (e) {
-      return e.message;
-    } catch (e) {
-      return 'تعذّرت إضافة القسم: $e';
-    }
+  /// Adds a new category and returns its new id (or null if the name was
+  /// empty). Used both by the category-manager sheet and by the inline
+  /// "add new category" option in the product editor's category dropdown.
+  Future<int?> saveCategory(String name) async {
+    if (name.trim().isEmpty) return null;
+    final id = await _productRepository.addCategory(name.trim());
+    await load();
+    return id;
   }
 
-  /// Renames an existing category.
-  Future<String?> renameCategory(int id, String newName) async {
-    if (newName.trim().isEmpty) return null;
-    try {
-      await _productRepository.updateCategory(CategoryModel(id: id, name: newName.trim()));
-      await load();
-      return null;
-    } on AppException catch (e) {
-      return e.message;
-    } catch (e) {
-      return e.toString();
-    }
-  }
-
-  /// Deletes a category. Returns an error message if it can't be deleted
-  /// (e.g. products still reference it), or null on success.
+  /// Returns null on success, or a user-facing error message on failure
+  /// (e.g. trying to delete a category that still has products in it).
   Future<String?> deleteCategory(int id) async {
-    final hasProducts = state.products.any((p) => p.categoryId == id);
-    if (hasProducts) {
-      return 'لا يمكن حذف هذا القسم لأنه يحتوي على منتجات. انقل المنتجات أولاً أو احذفها.';
-    }
     try {
       await _productRepository.deleteCategory(id);
       await load();
