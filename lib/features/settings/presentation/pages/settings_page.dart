@@ -273,7 +273,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 onPressed: state.loading
                     ? null
                     : () async {
-                        final parsedTaxPercent = double.tryParse(_taxRateController.text.trim());
+                        final parsedTaxPercent = double.tryParse(_taxRateController.text.trim().replaceAll(',', '.'));
                         final updated = settings.copyWith(
                           storeName: _storeNameController.text.trim().isEmpty
                               ? settings.storeName
@@ -282,7 +282,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           clearStorePhone: _storePhoneController.text.trim().isEmpty,
                           currency: _currency,
                           secondaryCurrencyCode: _secondaryCurrency,
-                          exchangeRate: double.tryParse(_exchangeRateController.text.trim()) ??
+                          exchangeRate: double.tryParse(_exchangeRateController.text.trim().replaceAll(',', '.')) ??
                               settings.exchangeRate,
                           // بيرجع يتخزن كنسبة عشرية (11 -> 0.11)
                           taxRate: parsedTaxPercent != null ? parsedTaxPercent / 100 : settings.taxRate,
