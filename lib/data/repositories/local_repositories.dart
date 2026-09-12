@@ -381,7 +381,7 @@ class LocalSalesRepository implements SalesRepository {
       );
       final tax = MoneyCalculator.tax(
         taxableAmount: taxableSubtotal,
-        taxEnabled: input.taxEnabled,
+        taxEnabled: true,
         taxRate: input.taxRate,
       );
       final total = MoneyCalculator.orderTotal(

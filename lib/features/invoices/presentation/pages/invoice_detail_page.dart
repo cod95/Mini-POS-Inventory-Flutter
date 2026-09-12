@@ -198,7 +198,7 @@ class _InvoiceDetailView extends StatelessWidget {
                           exchangeRate: settings.exchangeRate,
                         ),
                       ),
-                      if (settings.taxEnabled)
+                      if (sale.taxTotal > 0)
                         _totalLine(
                           context,
                           l10n.tr('totalAfterTax'),

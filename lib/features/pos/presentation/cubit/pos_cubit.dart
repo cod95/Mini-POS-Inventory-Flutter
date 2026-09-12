@@ -78,7 +78,7 @@ class PosState extends Equatable {
 
   double get tax => MoneyCalculator.tax(
         taxableAmount: taxableSubtotal,
-        taxEnabled: taxEnabled,
+        taxEnabled: true,
         taxRate: taxRate,
       );
 

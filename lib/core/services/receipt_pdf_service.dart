@@ -214,7 +214,7 @@ class ReceiptPdfService {
               // tax-inclusive total (only when TVA applies), then item count.
               _totalLine(t['totalUsd']!, fmtUsd(preTaxTotal), style),
               _totalLine(t['totalLbp']!, fmtLbp(preTaxTotal), style),
-              if (taxEnabled && sale.taxTotal > 0)
+              if (sale.taxTotal > 0)
                 _totalLine(t['totalAfterTax']!, fmtMain(sale.total), style, bold: true),
               _totalLine(t['itemCount']!, '$itemCount', style),
               pw.SizedBox(height: 8),
