@@ -31,6 +31,11 @@ class ProductsPage extends StatelessWidget {
 class _ProductsView extends StatelessWidget {
   const _ProductsView();
 
+  /// Special dropdown value that means "open the add-category prompt"
+  /// instead of actually selecting a category. Kept far from real ids
+  /// (which start at 1) so it can never collide with one.
+  static const _addCategorySentinel = -999;
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -73,7 +78,7 @@ class _ProductsView extends StatelessWidget {
                     scrollDirection: Axis.horizontal,
                     children: [
                       FilterChip(
-                        label: Text(context.l10n.tr('all')),
+                        label: const Text('All'),
                         selected: state.filter.categoryId == null,
                         onSelected: (_) => context.read<ProductsCubit>().applyFilter(categoryId: -1),
                       ),
@@ -139,7 +144,7 @@ class _ProductsView extends StatelessWidget {
                               context: context,
                               builder: (context) => AlertDialog(
                                 title: Text(l10n.tr('delete')),
-                                content: Text('${context.l10n.tr('deleteProductConfirm')} ${product.name}?'),
+                                content: Text('Delete ${product.name}?'),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.of(context).pop(false),
@@ -204,89 +209,49 @@ class _ProductsView extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(blocContext.l10n.tr('manageCategories'), style: Theme.of(blocContext).textTheme.titleLarge),
+                      Text('إدارة الأقسام', style: Theme.of(blocContext).textTheme.titleLarge),
                       const SizedBox(height: AppSpacing.md),
                       if (state.categories.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                          child: Text(blocContext.l10n.tr('noCategoriesYet')),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                          child: Text('لا يوجد أقسام بعد'),
                         )
                       else
                         ...state.categories.map(
                           (c) => ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text(c.name),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined),
-                                  onPressed: () async {
-                                    final renameController = TextEditingController(text: c.name);
-                                    final newName = await showDialog<String>(
-                                      context: blocContext,
-                                      builder: (ctx) => AlertDialog(
-                                        title: Text(blocContext.l10n.tr('renameCategory')),
-                                        content: AppTextField(
-                                          controller: renameController,
-                                          label: blocContext.l10n.tr('newName'),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.of(ctx).pop(),
-                                            child: Text(blocContext.l10n.tr('cancel')),
-                                          ),
-                                          FilledButton(
-                                            onPressed: () => Navigator.of(ctx).pop(renameController.text),
-                                            child: Text(blocContext.l10n.tr('save')),
-                                          ),
-                                        ],
+                            trailing: IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                color: Theme.of(blocContext).colorScheme.error,
+                              ),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: blocContext,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('حذف القسم'),
+                                    content: Text('هل تريد حذف "${c.name}"؟'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(false),
+                                        child: const Text('إلغاء'),
                                       ),
-                                    );
-                                    if (newName == null || newName.trim().isEmpty || newName.trim() == c.name) {
-                                      return;
-                                    }
-                                    final error = await cubit.renameCategory(c.id, newName);
-                                    if (blocContext.mounted && error != null) {
-                                      ScaffoldMessenger.of(blocContext).showSnackBar(
-                                        SnackBar(content: Text(error)),
-                                      );
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.delete_outline,
-                                    color: Theme.of(blocContext).colorScheme.error,
+                                      FilledButton(
+                                        onPressed: () => Navigator.of(ctx).pop(true),
+                                        child: const Text('حذف'),
+                                      ),
+                                    ],
                                   ),
-                                  onPressed: () async {
-                                    final confirmed = await showDialog<bool>(
-                                      context: blocContext,
-                                      builder: (ctx) => AlertDialog(
-                                        title: Text(blocContext.l10n.tr('deleteCategoryConfirm')),
-                                        content: Text('${blocContext.l10n.tr('confirmDeleteCategoryQuestion')} "${c.name}"؟'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.of(ctx).pop(false),
-                                            child: Text(blocContext.l10n.tr('cancel')),
-                                          ),
-                                          FilledButton(
-                                            onPressed: () => Navigator.of(ctx).pop(true),
-                                            child: Text(blocContext.l10n.tr('delete')),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    if (confirmed != true) return;
-                                    final error = await cubit.deleteCategory(c.id);
-                                    if (blocContext.mounted && error != null) {
-                                      ScaffoldMessenger.of(blocContext).showSnackBar(
-                                        SnackBar(content: Text(error)),
-                                      );
-                                    }
-                                  },
-                                ),
-                              ],
+                                );
+                                if (confirmed != true) return;
+                                final error = await cubit.deleteCategory(c.id);
+                                if (blocContext.mounted && error != null) {
+                                  ScaffoldMessenger.of(blocContext).showSnackBar(
+                                    SnackBar(content: Text(error)),
+                                  );
+                                }
+                              },
                             ),
                           ),
                         ),
@@ -296,23 +261,16 @@ class _ProductsView extends StatelessWidget {
                           Expanded(
                             child: AppTextField(
                               controller: newCategoryController,
-                              label: blocContext.l10n.tr('newCategoryName'),
+                              label: 'اسم القسم الجديد',
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           FilledButton(
                             onPressed: () async {
-                              final name = newCategoryController.text;
-                              final error = await cubit.saveCategory(name);
-                              if (error == null) {
-                                newCategoryController.clear();
-                              } else if (blocContext.mounted) {
-                                ScaffoldMessenger.of(blocContext).showSnackBar(
-                                  SnackBar(content: Text(error)),
-                                );
-                              }
+                              await cubit.saveCategory(newCategoryController.text);
+                              newCategoryController.clear();
                             },
-                            child: Text(blocContext.l10n.tr('add')),
+                            child: const Text('إضافة'),
                           ),
                         ],
                       ),
@@ -325,6 +283,30 @@ class _ProductsView extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Shows a small dialog to type a brand-new category name, creates it,
+  /// and returns its (id, name) — or null if the user cancelled.
+  Future<(int, String)?> _promptAddCategory(BuildContext context, ProductsCubit cubit) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('قسم جديد'),
+        content: AppTextField(controller: controller, label: 'اسم القسم'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('إضافة'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return null;
+    final id = await cubit.saveCategory(name);
+    if (id == null) return null;
+    return (id, name);
   }
 
   Future<void> _showProductEditor(BuildContext context, {ProductView? existing}) async {
@@ -363,8 +345,8 @@ class _ProductsView extends StatelessWidget {
       text: (existing?.imagePath?.startsWith('http') ?? false) ? existing!.imagePath! : '',
     );
     int? categoryId = existing?.categoryId;
+    var categories = List<CategoryModel>.of(state.categories);
     String? pickedImagePath = existing?.imagePath;
-    bool isTaxable = existing?.taxable ?? false;
 
     final picker = ImagePicker();
 
@@ -421,7 +403,7 @@ class _ProductsView extends StatelessWidget {
                                     children: [
                                       ListTile(
                                         leading: const Icon(Icons.photo_library_outlined),
-                                        title: Text(context.l10n.tr('chooseFromGallery')),
+                                        title: const Text('Choose from gallery'),
                                         onTap: () {
                                           Navigator.of(ctx).pop();
                                           pickImage(ImageSource.gallery);
@@ -429,7 +411,7 @@ class _ProductsView extends StatelessWidget {
                                       ),
                                       ListTile(
                                         leading: const Icon(Icons.camera_alt_outlined),
-                                        title: Text(context.l10n.tr('takePhoto')),
+                                        title: const Text('Take a photo'),
                                         onTap: () {
                                           Navigator.of(ctx).pop();
                                           pickImage(ImageSource.camera);
@@ -438,7 +420,7 @@ class _ProductsView extends StatelessWidget {
                                       if (pickedImagePath != null)
                                         ListTile(
                                           leading: const Icon(Icons.delete_outline),
-                                          title: Text(context.l10n.tr('removeImage')),
+                                          title: const Text('Remove image'),
                                           onTap: () {
                                             Navigator.of(ctx).pop();
                                             setState(() {
@@ -465,7 +447,7 @@ class _ProductsView extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
-                              context.l10n.tr('tapToPick'),
+                              'Tap to pick',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
@@ -478,7 +460,7 @@ class _ProductsView extends StatelessWidget {
                             children: [
                               AppTextField(
                                 controller: imageUrlController,
-                                label: context.l10n.tr('fieldImageUrl'),
+                                label: 'Image URL (https://...)',
                                 onChanged: (url) {
                                   final trimmed = url.trim();
                                   if (trimmed.startsWith('http')) {
@@ -498,28 +480,37 @@ class _ProductsView extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.md),
 
-                    AppTextField(controller: name, label: context.l10n.tr('fieldName')),
+                    AppTextField(controller: name, label: 'Name'),
                     const SizedBox(height: AppSpacing.sm),
-                    AppTextField(controller: sku, label: context.l10n.tr('fieldSku')),
+                    AppTextField(controller: sku, label: 'SKU'),
                     const SizedBox(height: AppSpacing.sm),
-                    AppTextField(controller: barcode, label: context.l10n.tr('fieldBarcode')),
+                    AppTextField(controller: barcode, label: 'Barcode'),
                     const SizedBox(height: AppSpacing.sm),
                     AppDropdown<int?>(
-                      label: context.l10n.tr('fieldCategory'),
+                      label: 'Category',
                       value: categoryId,
                       items: [
-                        DropdownMenuItem<int?>(value: null, child: Text(context.l10n.tr('noCategory'))),
-                        ...state.categories
+                        const DropdownMenuItem<int?>(value: null, child: Text('No category')),
+                        ...categories
                             .map((c) => DropdownMenuItem<int?>(value: c.id, child: Text(c.name))),
+                        const DropdownMenuItem<int?>(
+                          value: _addCategorySentinel,
+                          child: Text('+ إضافة قسم جديد…'),
+                        ),
                       ],
-                      onChanged: (value) => setState(() => categoryId = value),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(context.l10n.tr('tva')),
-                      value: isTaxable,
-                      onChanged: (value) => setState(() => isTaxable = value),
+                      onChanged: (value) async {
+                        if (value == _addCategorySentinel) {
+                          final result = await _promptAddCategory(context, cubit);
+                          if (result != null) {
+                            setState(() {
+                              categories = [...categories, CategoryModel(id: result.$1, name: result.$2)];
+                              categoryId = result.$1;
+                            });
+                          }
+                          return;
+                        }
+                        setState(() => categoryId = value);
+                      },
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Row(
@@ -527,7 +518,7 @@ class _ProductsView extends StatelessWidget {
                         Expanded(
                           child: AppTextField(
                             controller: cost,
-                            label: '${context.l10n.tr('fieldCost')} ($currency)',
+                            label: 'Cost ($currency)',
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -535,7 +526,7 @@ class _ProductsView extends StatelessWidget {
                         Expanded(
                           child: AppTextField(
                             controller: price,
-                            label: '${context.l10n.tr('fieldPrice')} ($currency)',
+                            label: 'Price ($currency)',
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -544,12 +535,12 @@ class _ProductsView extends StatelessWidget {
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
-                        Expanded(child: AppTextField(controller: stock, label: context.l10n.tr('fieldStock'), keyboardType: TextInputType.number)),
+                        Expanded(child: AppTextField(controller: stock, label: 'Stock', keyboardType: TextInputType.number)),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: AppTextField(
                             controller: low,
-                            label: context.l10n.tr('fieldLowStockThreshold'),
+                            label: 'Low stock threshold',
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -558,9 +549,9 @@ class _ProductsView extends StatelessWidget {
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
-                        Expanded(child: AppTextField(controller: unit, label: context.l10n.tr('fieldUnit'))),
+                        Expanded(child: AppTextField(controller: unit, label: 'Unit (piece/kg)')),
                         const SizedBox(width: AppSpacing.sm),
-                        Expanded(child: AppTextField(controller: notes, label: context.l10n.tr('fieldNotes'))),
+                        Expanded(child: AppTextField(controller: notes, label: 'Notes')),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -593,7 +584,6 @@ class _ProductsView extends StatelessWidget {
                           unit: unit.text.trim().isEmpty ? 'piece' : unit.text.trim(),
                           notes: notes.text.trim().isEmpty ? null : notes.text.trim(),
                           imagePath: pickedImagePath,
-                          taxable: isTaxable,
                         );
                         await cubit.saveProduct(input);
                         if (context.mounted) Navigator.of(context).pop();
@@ -632,10 +622,10 @@ class _ProductsView extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${context.l10n.tr('stockAction')} • ${product.name}'),
+                  Text('Stock action • ${product.name}'),
                   const SizedBox(height: AppSpacing.md),
                   AppDropdown<StockMovementType>(
-                    label: context.l10n.tr('fieldAction'),
+                    label: 'Action',
                     value: type,
                     items: StockMovementType.values
                         .where((e) => e != StockMovementType.sale && e != StockMovementType.returnSale)
@@ -646,9 +636,9 @@ class _ProductsView extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  AppTextField(controller: qty, label: context.l10n.tr('fieldQuantity'), keyboardType: TextInputType.number),
+                  AppTextField(controller: qty, label: 'Quantity', keyboardType: TextInputType.number),
                   const SizedBox(height: AppSpacing.sm),
-                  AppTextField(controller: reason, label: context.l10n.tr('fieldReason')),
+                  AppTextField(controller: reason, label: 'Reason'),
                   const SizedBox(height: AppSpacing.lg),
                   PrimaryButton(
                     label: context.l10n.tr('save'),
@@ -752,7 +742,7 @@ class _ProductListTile extends StatelessWidget {
                     : Theme.of(context).colorScheme.secondaryContainer,
                 borderRadius: AppRadii.sm,
               ),
-              child: Text('${context.l10n.tr('stockLabel')} ${product.stockQty}'),
+              child: Text('Stock ${product.stockQty}'),
             ),
           ],
         ),
