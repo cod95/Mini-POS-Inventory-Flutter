@@ -302,8 +302,15 @@ class _ProductsView extends StatelessWidget {
                           const SizedBox(width: AppSpacing.sm),
                           FilledButton(
                             onPressed: () async {
-                              await cubit.saveCategory(newCategoryController.text);
-                              newCategoryController.clear();
+                              final name = newCategoryController.text;
+                              final error = await cubit.saveCategory(name);
+                              if (error == null) {
+                                newCategoryController.clear();
+                              } else if (blocContext.mounted) {
+                                ScaffoldMessenger.of(blocContext).showSnackBar(
+                                  SnackBar(content: Text(error)),
+                                );
+                              }
                             },
                             child: Text(blocContext.l10n.tr('add')),
                           ),
@@ -357,6 +364,7 @@ class _ProductsView extends StatelessWidget {
     );
     int? categoryId = existing?.categoryId;
     String? pickedImagePath = existing?.imagePath;
+    bool isTaxable = existing?.taxable ?? false;
 
     final picker = ImagePicker();
 
@@ -507,6 +515,13 @@ class _ProductsView extends StatelessWidget {
                       onChanged: (value) => setState(() => categoryId = value),
                     ),
                     const SizedBox(height: AppSpacing.sm),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(context.l10n.tr('tva')),
+                      value: isTaxable,
+                      onChanged: (value) => setState(() => isTaxable = value),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
                         Expanded(
@@ -578,6 +593,7 @@ class _ProductsView extends StatelessWidget {
                           unit: unit.text.trim().isEmpty ? 'piece' : unit.text.trim(),
                           notes: notes.text.trim().isEmpty ? null : notes.text.trim(),
                           imagePath: pickedImagePath,
+                          taxable: isTaxable,
                         );
                         await cubit.saveProduct(input);
                         if (context.mounted) Navigator.of(context).pop();

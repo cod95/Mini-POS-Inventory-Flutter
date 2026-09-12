@@ -33,6 +33,10 @@ class Products extends Table {
 
   TextColumn get imagePath => text().nullable()();
 
+  /// Whether TVA applies to this product. Set per-product when adding/editing
+  /// it; only taxable items contribute to the invoice's tax total.
+  BoolColumn get taxable => boolean().withDefault(const Constant(false))();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
@@ -160,6 +164,9 @@ class SaleItems extends Table {
   RealColumn get discount => real().withDefault(const Constant(0))();
 
   RealColumn get lineTotal => real()();
+
+  /// Snapshot of whether TVA applied to this item at the time of sale.
+  BoolColumn get taxable => boolean().withDefault(const Constant(false))();
 }
 
 class AppSettings extends Table {
@@ -220,7 +227,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -238,6 +245,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 4) {
             await m.addColumn(appSettings, appSettings.storePhone);
             await m.addColumn(sales, sales.customerName);
+          }
+          if (from < 5) {
+            await m.addColumn(products, products.taxable);
+            await m.addColumn(saleItems, saleItems.taxable);
           }
         },
       );

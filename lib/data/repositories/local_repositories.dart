@@ -107,7 +107,6 @@ class LocalProductRepository implements ProductRepository {
   Future<int> addCategory(String name) {
     return _db.into(_db.categories).insert(
           CategoriesCompanion.insert(name: name.trim()),
-          mode: InsertMode.insertOrReplace,
         );
   }
 
@@ -268,6 +267,7 @@ class LocalProductRepository implements ProductRepository {
               unit: Value(input.unit),
               notes: Value(input.notes),
               imagePath: Value(input.imagePath),
+              taxable: Value(input.taxable),
               createdAt: Value(DateTime.now()),
               updatedAt: Value(DateTime.now()),
             ),
@@ -287,6 +287,7 @@ class LocalProductRepository implements ProductRepository {
         unit: Value(input.unit),
         notes: Value(input.notes),
         imagePath: Value(input.imagePath),
+        taxable: Value(input.taxable),
         updatedAt: Value(DateTime.now()),
       ),
     );
@@ -314,6 +315,7 @@ class LocalProductRepository implements ProductRepository {
       unit: row.unit,
       notes: row.notes,
       imagePath: row.imagePath,
+      taxable: row.taxable,
     );
   }
 }
@@ -365,8 +367,20 @@ class LocalSalesRepository implements SalesRepository {
       final subtotal = MoneyCalculator.subtotal(lineTotals);
       final itemDiscountTotal =
           MoneyCalculator.round2(input.items.fold(0, (sum, item) => sum + item.discount));
+      // TVA applies only to items individually marked taxable.
+      final taxableSubtotal = MoneyCalculator.round2(
+        input.items.where((item) => item.taxable).fold<double>(
+              0,
+              (sum, item) => sum +
+                  MoneyCalculator.lineTotal(
+                    unitPrice: item.price,
+                    qty: item.qty,
+                    itemDiscount: item.discount,
+                  ),
+            ),
+      );
       final tax = MoneyCalculator.tax(
-        taxableAmount: max(0, subtotal - input.orderDiscount),
+        taxableAmount: taxableSubtotal,
         taxEnabled: input.taxEnabled,
         taxRate: input.taxRate,
       );
@@ -418,6 +432,7 @@ class LocalSalesRepository implements SalesRepository {
                 qty: item.qty,
                 discount: Value(item.discount),
                 lineTotal: lineTotals[i],
+                taxable: Value(item.taxable),
               ),
             );
 
@@ -574,6 +589,7 @@ class LocalSalesRepository implements SalesRepository {
                 qty: -returnInput.qty,
                 discount: Value(returnDiscount),
                 lineTotal: returnLineTotal,
+                taxable: Value(original.taxable),
               ),
             );
 
@@ -629,6 +645,7 @@ class LocalSalesRepository implements SalesRepository {
       qty: item.qty,
       discount: item.discount,
       lineTotal: item.lineTotal,
+      taxable: item.taxable,
     );
   }
 

@@ -202,6 +202,7 @@ class ProductUpsertInput extends Equatable {
     this.unit = 'piece',
     this.notes,
     this.imagePath,
+    this.taxable = false,
   });
 
   final int? id;
@@ -216,6 +217,7 @@ class ProductUpsertInput extends Equatable {
   final String unit;
   final String? notes;
   final String? imagePath;
+  final bool taxable;
 
   @override
   List<Object?> get props => [
@@ -231,6 +233,7 @@ class ProductUpsertInput extends Equatable {
         unit,
         notes,
         imagePath,
+        taxable,
       ];
 }
 
@@ -386,6 +389,7 @@ class CartItem extends Equatable {
     required this.price,
     required this.qty,
     this.discount = 0,
+    this.taxable = false,
   });
 
   final int productId;
@@ -396,6 +400,7 @@ class CartItem extends Equatable {
   final double price;
   final int qty;
   final double discount;
+  final bool taxable;
 
   CartItem copyWith({
     int? qty,
@@ -411,6 +416,7 @@ class CartItem extends Equatable {
       price: price ?? this.price,
       qty: qty ?? this.qty,
       discount: discount ?? this.discount,
+      taxable: taxable,
     );
   }
 
@@ -424,6 +430,7 @@ class CartItem extends Equatable {
         price,
         qty,
         discount,
+        taxable,
       ];
 }
 

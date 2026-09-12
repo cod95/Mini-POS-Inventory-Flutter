@@ -106,10 +106,23 @@ class ProductsCubit extends Cubit<ProductsState> {
     }
   }
 
-  Future<void> saveCategory(String name) async {
-    if (name.trim().isEmpty) return;
-    await _productRepository.addCategory(name.trim());
-    await load();
+  /// Adds a new category. Returns an error message if it fails (e.g. a
+  /// category with that name already exists), or null on success.
+  Future<String?> saveCategory(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return null;
+    if (state.categories.any((c) => c.name.toLowerCase() == trimmed.toLowerCase())) {
+      return 'هذا القسم موجود مسبقًا';
+    }
+    try {
+      await _productRepository.addCategory(trimmed);
+      await load();
+      return null;
+    } on AppException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'تعذّرت إضافة القسم: $e';
+    }
   }
 
   /// Renames an existing category.

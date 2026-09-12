@@ -64,8 +64,20 @@ class PosState extends Equatable {
     return MoneyCalculator.subtotal(totals);
   }
 
+  double get taxableSubtotal {
+    final totals = cart
+        .where((item) => item.taxable)
+        .map((item) => MoneyCalculator.lineTotal(
+              unitPrice: item.price,
+              qty: item.qty,
+              itemDiscount: item.discount,
+            ))
+        .toList();
+    return MoneyCalculator.subtotal(totals);
+  }
+
   double get tax => MoneyCalculator.tax(
-        taxableAmount: max(0, subtotal - orderDiscount),
+        taxableAmount: taxableSubtotal,
         taxEnabled: taxEnabled,
         taxRate: taxRate,
       );
@@ -247,6 +259,7 @@ class PosCubit extends Cubit<PosState> {
           cost: product.cost,
           price: product.price,
           qty: 1,
+          taxable: product.taxable,
         ),
       );
     } else {

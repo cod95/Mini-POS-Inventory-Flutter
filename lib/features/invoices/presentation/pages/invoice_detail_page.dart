@@ -114,7 +114,28 @@ class _InvoiceDetailView extends StatelessWidget {
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(flex: 3, child: Text(item.nameSnapshot)),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Row(
+                                        children: [
+                                          Flexible(child: Text(item.nameSnapshot)),
+                                          if (item.taxable) ...[
+                                            const SizedBox(width: 4),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                              decoration: BoxDecoration(
+                                                border: Border.all(color: Theme.of(context).colorScheme.outline),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                'TVA',
+                                                style: Theme.of(context).textTheme.labelSmall,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
                                     Expanded(
                                       child: Text('${item.qty}', textAlign: TextAlign.center),
                                     ),

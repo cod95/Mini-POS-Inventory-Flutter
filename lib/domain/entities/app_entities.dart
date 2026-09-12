@@ -17,6 +17,7 @@ class ProductView extends Equatable {
     required this.unit,
     required this.notes,
     this.imagePath,
+    this.taxable = false,
   });
 
   final int id;
@@ -32,6 +33,7 @@ class ProductView extends Equatable {
   final String unit;
   final String? notes;
   final String? imagePath;
+  final bool taxable;
 
   bool get isLowStock => stockQty <= lowStockThreshold;
 
@@ -50,6 +52,7 @@ class ProductView extends Equatable {
         unit,
         notes,
         imagePath,
+        taxable,
       ];
 }
 
@@ -64,6 +67,7 @@ class SaleItemView extends Equatable {
     required this.qty,
     required this.discount,
     required this.lineTotal,
+    this.taxable = false,
   });
 
   final int id;
@@ -75,6 +79,7 @@ class SaleItemView extends Equatable {
   final int qty;
   final double discount;
   final double lineTotal;
+  final bool taxable;
 
   @override
   List<Object?> get props => [
@@ -87,6 +92,7 @@ class SaleItemView extends Equatable {
         qty,
         discount,
         lineTotal,
+        taxable,
       ];
 }
 
