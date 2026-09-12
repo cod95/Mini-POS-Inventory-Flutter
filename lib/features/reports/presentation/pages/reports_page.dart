@@ -157,6 +157,24 @@ class _ReportsView extends StatelessWidget {
                             ),
                           ],
                         ),
+                        const SizedBox(height: AppSpacing.sm),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: state.loading
+                                ? null
+                                : () {
+                                    final settings = context.read<AppCubit>().state.settings;
+                                    context.read<ReportsCubit>().printPeriodReport(
+                                          storeName: settings.storeName,
+                                          currency: settings.currency,
+                                          languageCode: settings.language,
+                                        );
+                                  },
+                            icon: const Icon(Icons.summarize_outlined),
+                            label: Text(l10n.tr('printPeriodReport')),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -195,41 +213,77 @@ class _RangeCard extends StatelessWidget {
     final from = state.from;
     final to = state.to;
     final label = from == null || to == null
-        ? 'All time'
+        ? context.l10n.tr('allTime')
         : '${AppFormatters.shortDate(from)} → ${AppFormatters.shortDate(to)}';
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: Text('${context.l10n.tr('range')}: $label')),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final now = DateTime.now();
-                final range = await showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(now.year - 2),
-                  lastDate: DateTime(now.year + 1),
-                  initialDateRange: from != null && to != null
-                      ? DateTimeRange(start: from, end: to)
-                      : DateTimeRange(
-                          start: DateTime(now.year, now.month, 1),
-                          end: now,
-                        ),
-                );
-                if (!context.mounted) return;
-                if (range != null) {
-                  await context.read<ReportsCubit>().setRange(range.start, range.end);
-                }
-              },
-              icon: const Icon(Icons.date_range_outlined),
-              label: Text(context.l10n.tr('pick')),
+            Wrap(
+              spacing: AppSpacing.xs,
+              children: [
+                ActionChip(
+                  label: Text(context.l10n.tr('today')),
+                  onPressed: () {
+                    final now = DateTime.now();
+                    context
+                        .read<ReportsCubit>()
+                        .setRange(DateTime(now.year, now.month, now.day), now);
+                  },
+                ),
+                ActionChip(
+                  label: Text(context.l10n.tr('thisWeek')),
+                  onPressed: () {
+                    final now = DateTime.now();
+                    context
+                        .read<ReportsCubit>()
+                        .setRange(now.subtract(Duration(days: now.weekday - 1)), now);
+                  },
+                ),
+                ActionChip(
+                  label: Text(context.l10n.tr('thisMonth')),
+                  onPressed: () {
+                    final now = DateTime.now();
+                    context.read<ReportsCubit>().setRange(DateTime(now.year, now.month, 1), now);
+                  },
+                ),
+              ],
             ),
-            const SizedBox(width: AppSpacing.sm),
-            TextButton(
-              onPressed: () => context.read<ReportsCubit>().setRange(null, null),
-              child: Text(context.l10n.tr('reset')),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(child: Text('${context.l10n.tr('range')}: $label')),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final now = DateTime.now();
+                    final range = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(now.year - 2),
+                      lastDate: DateTime(now.year + 1),
+                      initialDateRange: from != null && to != null
+                          ? DateTimeRange(start: from, end: to)
+                          : DateTimeRange(
+                              start: DateTime(now.year, now.month, 1),
+                              end: now,
+                            ),
+                    );
+                    if (!context.mounted) return;
+                    if (range != null) {
+                      await context.read<ReportsCubit>().setRange(range.start, range.end);
+                    }
+                  },
+                  icon: const Icon(Icons.date_range_outlined),
+                  label: Text(context.l10n.tr('pick')),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                TextButton(
+                  onPressed: () => context.read<ReportsCubit>().setRange(null, null),
+                  child: Text(context.l10n.tr('reset')),
+                ),
+              ],
             ),
           ],
         ),

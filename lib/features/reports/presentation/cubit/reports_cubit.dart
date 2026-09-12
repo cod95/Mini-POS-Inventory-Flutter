@@ -141,4 +141,37 @@ class ReportsCubit extends Cubit<ReportsState> {
       emit(state.copyWith(loading: false, error: e.toString()));
     }
   }
+
+  /// Prints a period report: invoices sold/returned (count + total) and the
+  /// remaining stock quantity for every product. Uses the currently selected
+  /// date range (defaults to "from the beginning" if none is set).
+  Future<void> printPeriodReport({required String storeName, required String currency, String languageCode = 'en'}) async {
+    emit(state.copyWith(loading: true, clearError: true));
+    try {
+      final from = state.from ?? DateTime(2000);
+      final to = state.to ?? DateTime.now();
+      final rows = await _reportsRepository.salesReportRows(from: from, to: to);
+      final inventory = await _reportsRepository.inventoryReportRows();
+
+      final completed = rows.where((r) => r.status == 'completed');
+      final returned = rows.where((r) => r.status == 'returned');
+
+      final file = await _exportService.generatePeriodReportPdf(
+        storeName: storeName,
+        from: from,
+        to: to,
+        invoiceCount: completed.length,
+        totalSales: completed.fold<double>(0, (sum, r) => sum + r.total),
+        returnCount: returned.length,
+        totalReturns: returned.fold<double>(0, (sum, r) => sum + r.total.abs()),
+        inventory: inventory,
+        currency: currency,
+        languageCode: languageCode,
+      );
+      await _exportService.shareFile(file);
+      emit(state.copyWith(loading: false, lastExport: file));
+    } catch (e) {
+      emit(state.copyWith(loading: false, error: e.toString()));
+    }
+  }
 }
