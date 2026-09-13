@@ -31,6 +31,7 @@ class PosPage extends StatelessWidget {
         partyRepository: deps.partyRepository,
         scannerService: deps.barcodeScannerService,
         receiptPdfService: deps.receiptPdfService,
+        bluetoothPrinterService: deps.bluetoothPrinterService,
       )..load(),
       child: const _PosView(),
     );
@@ -486,6 +487,14 @@ class _CheckoutBarState extends State<_CheckoutBar> {
                               icon: const Icon(Icons.print_outlined),
                               label: Text(context.l10n.tr('printReceipt')),
                             ),
+                            if (context.watch<AppCubit>().state.settings.printerMacAddress != null)
+                              OutlinedButton.icon(
+                                onPressed: state.receiptProcessing
+                                    ? null
+                                    : () => context.read<PosCubit>().printLastReceiptViaBluetooth(),
+                                icon: const Icon(Icons.bluetooth),
+                                label: Text(context.l10n.tr('printViaBluetooth')),
+                              ),
                             OutlinedButton.icon(
                               onPressed: state.receiptProcessing
                                   ? null

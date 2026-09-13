@@ -182,6 +182,11 @@ class AppSettings extends Table {
   /// showing only sales from this point forward until changed again.
   DateTimeColumn get lastReportReset => dateTime().nullable()();
 
+  /// Paired Bluetooth thermal printer — set once from Settings.
+  TextColumn get printerMacAddress => text().nullable()();
+  TextColumn get printerName => text().nullable()();
+  TextColumn get printerPaperWidthMm => text().withDefault(const Constant('80'))();
+
   /// The main currency products are priced in and sold with (e.g. 'USD').
   TextColumn get currency => text().withDefault(const Constant('USD'))();
 
@@ -232,7 +237,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -257,6 +262,11 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 6) {
             await m.addColumn(appSettings, appSettings.lastReportReset);
+          }
+          if (from < 7) {
+            await m.addColumn(appSettings, appSettings.printerMacAddress);
+            await m.addColumn(appSettings, appSettings.printerName);
+            await m.addColumn(appSettings, appSettings.printerPaperWidthMm);
           }
         },
       );

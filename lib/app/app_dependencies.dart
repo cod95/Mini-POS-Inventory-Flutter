@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/services/barcode_scanner_service_impl.dart';
+import '../core/services/bluetooth_printer_service.dart';
 import '../core/services/file_export_service.dart';
 import '../core/services/receipt_pdf_service.dart';
 import '../core/services/stub_services.dart';
@@ -25,6 +26,7 @@ class AppDependencies {
     required this.barcodeScannerService,
     required this.fileExportService,
     required this.receiptPdfService,
+    required this.bluetoothPrinterService,
     required this.appCubit,
   });
 
@@ -43,6 +45,7 @@ class AppDependencies {
   final BarcodeScannerService barcodeScannerService;
   final FileExportService fileExportService;
   final ReceiptPdfService receiptPdfService;
+  final BluetoothPrinterService bluetoothPrinterService;
 
   final AppCubit appCubit;
 
@@ -62,6 +65,7 @@ class AppDependencies {
     final fileExportService = FileExportService();
     final printerService = StubPrinterService();
     final receiptPdfService = ReceiptPdfService(printerService: printerService);
+    final bluetoothPrinterService = BluetoothPrinterService();
     final syncService = FakeSyncService();
 
     final appCubit = AppCubit(
@@ -83,6 +87,7 @@ class AppDependencies {
       barcodeScannerService: barcodeScannerService,
       fileExportService: fileExportService,
       receiptPdfService: receiptPdfService,
+      bluetoothPrinterService: bluetoothPrinterService,
       appCubit: appCubit,
     );
   }

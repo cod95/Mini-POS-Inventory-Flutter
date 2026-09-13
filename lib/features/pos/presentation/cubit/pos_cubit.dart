@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/models/app_models.dart';
+import '../../../../core/services/bluetooth_printer_service.dart';
 import '../../../../core/services/receipt_pdf_service.dart';
 import '../../../../core/utils/money_calculator.dart';
 import '../../../../domain/entities/app_entities.dart';
@@ -168,12 +169,14 @@ class PosCubit extends Cubit<PosState> {
     required PartyRepository partyRepository,
     required BarcodeScannerService scannerService,
     required ReceiptPdfService receiptPdfService,
+    required BluetoothPrinterService bluetoothPrinterService,
   })  : _productRepository = productRepository,
         _salesRepository = salesRepository,
         _settingsRepository = settingsRepository,
         _partyRepository = partyRepository,
         _scannerService = scannerService,
         _receiptPdfService = receiptPdfService,
+        _bluetoothPrinterService = bluetoothPrinterService,
         super(const PosState());
 
   final ProductRepository _productRepository;
@@ -182,6 +185,7 @@ class PosCubit extends Cubit<PosState> {
   final PartyRepository _partyRepository;
   final BarcodeScannerService _scannerService;
   final ReceiptPdfService _receiptPdfService;
+  final BluetoothPrinterService _bluetoothPrinterService;
 
   Future<void> load() async {
     emit(state.copyWith(loading: true, clearError: true));
@@ -377,6 +381,46 @@ class PosCubit extends Cubit<PosState> {
 
   Future<void> printLastReceipt() async {
     await _handleReceiptAction(share: false);
+  }
+
+  Future<void> printLastReceiptViaBluetooth() async {
+    final checkout = state.lastResult;
+    if (checkout == null) {
+      emit(state.copyWith(error: 'No recent sale to generate receipt for'));
+      return;
+    }
+    emit(state.copyWith(receiptProcessing: true, clearError: true, clearInfoMessage: true));
+    try {
+      final settings = await _settingsRepository.getSettings();
+      if (settings.printerMacAddress == null) {
+        emit(state.copyWith(receiptProcessing: false, error: 'No Bluetooth printer selected in Settings'));
+        return;
+      }
+      final detail = await _salesRepository.getInvoiceDetail(checkout.saleId);
+      if (detail == null) {
+        throw AppException('Invoice details not found');
+      }
+      final connected = await _bluetoothPrinterService.connect(settings.printerMacAddress!);
+      if (!connected) {
+        emit(state.copyWith(receiptProcessing: false, error: 'Could not connect to the Bluetooth printer'));
+        return;
+      }
+      await _bluetoothPrinterService.printReceipt(
+        sale: detail.sale,
+        items: detail.items,
+        storeName: settings.storeName,
+        storePhone: settings.storePhone,
+        header: settings.receiptHeader,
+        footer: settings.receiptFooter,
+        currency: settings.currency,
+        exchangeRate: settings.exchangeRate,
+        paperWidthMm: settings.printerPaperWidthMm,
+        languageCode: settings.language,
+      );
+      emit(state.copyWith(receiptProcessing: false, infoMessage: 'Receipt sent to Bluetooth printer'));
+    } catch (e) {
+      emit(state.copyWith(receiptProcessing: false, error: e.toString()));
+    }
   }
 
   Future<void> _handleReceiptAction({required bool share}) async {

@@ -106,6 +106,9 @@ class AppSettingsModel extends Equatable {
     required this.cashierPin,
     required this.adminPassword,
     this.lastReportReset,
+    this.printerMacAddress,
+    this.printerName,
+    this.printerPaperWidthMm = '80',
   });
 
   final String storeName;
@@ -122,6 +125,9 @@ class AppSettingsModel extends Equatable {
   final String cashierPin;
   final String adminPassword;
   final DateTime? lastReportReset;
+  final String? printerMacAddress;
+  final String? printerName;
+  final String printerPaperWidthMm;
 
   AppSettingsModel copyWith({
     String? storeName,
@@ -139,6 +145,9 @@ class AppSettingsModel extends Equatable {
     String? cashierPin,
     String? adminPassword,
     DateTime? lastReportReset,
+    String? printerMacAddress,
+    String? printerName,
+    String? printerPaperWidthMm,
   }) {
     return AppSettingsModel(
       storeName: storeName ?? this.storeName,
@@ -155,6 +164,9 @@ class AppSettingsModel extends Equatable {
       cashierPin: cashierPin ?? this.cashierPin,
       adminPassword: adminPassword ?? this.adminPassword,
       lastReportReset: lastReportReset ?? this.lastReportReset,
+      printerMacAddress: printerMacAddress ?? this.printerMacAddress,
+      printerName: printerName ?? this.printerName,
+      printerPaperWidthMm: printerPaperWidthMm ?? this.printerPaperWidthMm,
     );
   }
 
@@ -173,6 +185,9 @@ class AppSettingsModel extends Equatable {
     cashierPin: '1234',
     adminPassword: 'admin123',
     lastReportReset: null,
+    printerMacAddress: null,
+    printerName: null,
+    printerPaperWidthMm: '80',
   );
 
   @override
@@ -191,6 +206,9 @@ class AppSettingsModel extends Equatable {
         cashierPin,
         adminPassword,
         lastReportReset,
+        printerMacAddress,
+        printerName,
+        printerPaperWidthMm,
       ];
 }
 

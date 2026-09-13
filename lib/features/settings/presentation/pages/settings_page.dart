@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../app/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/models/app_models.dart';
+import '../../../../core/services/bluetooth_printer_service.dart';
 import '../../../../core/state/app_cubit.dart';
 import '../../../../core/widgets/buttons.dart';
 import '../../../../core/widgets/fields.dart';
@@ -268,6 +270,53 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.tr('bluetoothPrinter'), style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        settings.printerName == null
+                            ? l10n.tr('noPrinterSelected')
+                            : '${l10n.tr('connectedPrinter')}: ${settings.printerName}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(l10n.tr('paperWidth'), style: Theme.of(context).textTheme.bodyMedium),
+                      const SizedBox(height: AppSpacing.xs),
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('58 mm'),
+                            selected: settings.printerPaperWidthMm == '58',
+                            onSelected: (_) => context
+                                .read<AppCubit>()
+                                .updateSettings(settings.copyWith(printerPaperWidthMm: '58')),
+                          ),
+                          ChoiceChip(
+                            label: const Text('80 mm'),
+                            selected: settings.printerPaperWidthMm == '80',
+                            onSelected: (_) => context
+                                .read<AppCubit>()
+                                .updateSettings(settings.copyWith(printerPaperWidthMm: '80')),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      OutlinedButton.icon(
+                        onPressed: () => _pickBluetoothPrinter(context, settings),
+                        icon: const Icon(Icons.bluetooth_searching),
+                        label: Text(l10n.tr('selectPrinter')),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
               PrimaryButton(
                 label: l10n.tr('save'),
                 onPressed: state.loading
@@ -317,6 +366,51 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _pickBluetoothPrinter(BuildContext context, AppSettingsModel settings) async {
+    final l10n = context.l10n;
+    final deps = AppScope.of(context);
+    final appCubit = context.read<AppCubit>();
+
+    final devices = await deps.bluetoothPrinterService.pairedDevices();
+    if (!context.mounted) return;
+
+    if (devices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.tr('noPairedPrinters'))));
+      return;
+    }
+
+    final picked = await showDialog<BluetoothPrinterDevice>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.tr('selectPrinter')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: devices.length,
+            itemBuilder: (context, index) {
+              final d = devices[index];
+              return ListTile(
+                leading: const Icon(Icons.print_outlined),
+                title: Text(d.name.isEmpty ? d.macAddress : d.name),
+                subtitle: Text(d.macAddress),
+                onTap: () => Navigator.of(ctx).pop(d),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.tr('cancel'))),
+        ],
+      ),
+    );
+
+    if (picked == null) return;
+    await appCubit.updateSettings(
+      settings.copyWith(printerMacAddress: picked.macAddress, printerName: picked.name),
     );
   }
 }

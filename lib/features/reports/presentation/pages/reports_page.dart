@@ -25,6 +25,7 @@ class ReportsPage extends StatelessWidget {
           reportsRepository: deps.reportsRepository,
           salesRepository: deps.salesRepository,
           exportService: deps.fileExportService,
+          bluetoothPrinterService: deps.bluetoothPrinterService,
         );
         if (settings.lastReportReset != null) {
           cubit.setRange(settings.lastReportReset, DateTime.now());
@@ -205,6 +206,28 @@ class _ReportsView extends StatelessWidget {
                             ),
                           ],
                         ),
+                        if (context.watch<AppCubit>().state.settings.printerMacAddress != null) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: state.loading
+                                  ? null
+                                  : () {
+                                      final settings = context.read<AppCubit>().state.settings;
+                                      context.read<ReportsCubit>().printPeriodReportViaBluetooth(
+                                            storeName: settings.storeName,
+                                            currency: settings.currency,
+                                            printerMacAddress: settings.printerMacAddress,
+                                            paperWidthMm: settings.printerPaperWidthMm,
+                                            languageCode: settings.language,
+                                          );
+                                    },
+                              icon: const Icon(Icons.bluetooth),
+                              label: Text(l10n.tr('printViaBluetooth')),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: AppSpacing.sm),
                         SizedBox(
                           width: double.infinity,

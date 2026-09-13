@@ -73,6 +73,9 @@ class LocalSettingsRepository implements SettingsRepository {
       cashierPin: row.cashierPin,
       adminPassword: row.adminPassword,
       lastReportReset: row.lastReportReset,
+      printerMacAddress: row.printerMacAddress,
+      printerName: row.printerName,
+      printerPaperWidthMm: row.printerPaperWidthMm,
     );
   }
 
@@ -95,6 +98,9 @@ class LocalSettingsRepository implements SettingsRepository {
             cashierPin: Value(settings.cashierPin),
             adminPassword: Value(settings.adminPassword),
             lastReportReset: Value(settings.lastReportReset),
+            printerMacAddress: Value(settings.printerMacAddress),
+            printerName: Value(settings.printerName),
+            printerPaperWidthMm: Value(settings.printerPaperWidthMm),
           ),
         );
   }

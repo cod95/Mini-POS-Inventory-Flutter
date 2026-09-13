@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/models/app_models.dart';
+import '../../../../core/services/bluetooth_printer_service.dart';
 import '../../../../core/services/file_export_service.dart';
 import '../../../../domain/entities/app_entities.dart';
 import '../../../../domain/repositories/repositories.dart';
@@ -77,14 +78,17 @@ class ReportsCubit extends Cubit<ReportsState> {
     required ReportsRepository reportsRepository,
     required SalesRepository salesRepository,
     required FileExportService exportService,
+    required BluetoothPrinterService bluetoothPrinterService,
   })  : _reportsRepository = reportsRepository,
         _salesRepository = salesRepository,
         _exportService = exportService,
+        _bluetoothPrinterService = bluetoothPrinterService,
         super(const ReportsState());
 
   final ReportsRepository _reportsRepository;
   final SalesRepository _salesRepository;
   final FileExportService _exportService;
+  final BluetoothPrinterService _bluetoothPrinterService;
 
   Future<void> load() async {
     emit(state.copyWith(loading: true, clearError: true));
@@ -179,6 +183,51 @@ class ReportsCubit extends Cubit<ReportsState> {
         await _exportService.printFile(file);
       }
       emit(state.copyWith(loading: false, lastExport: file));
+    } catch (e) {
+      emit(state.copyWith(loading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> printPeriodReportViaBluetooth({
+    required String storeName,
+    required String currency,
+    required String? printerMacAddress,
+    required String paperWidthMm,
+    String languageCode = 'en',
+  }) async {
+    if (printerMacAddress == null) {
+      emit(state.copyWith(error: 'No Bluetooth printer selected in Settings'));
+      return;
+    }
+    emit(state.copyWith(loading: true, clearError: true));
+    try {
+      final from = state.from ?? DateTime(2000);
+      final to = state.to ?? DateTime.now();
+      final rows = await _reportsRepository.salesReportRows(from: from, to: to);
+      final inventory = await _reportsRepository.inventoryReportRows();
+
+      final completed = rows.where((r) => r.status == 'completed');
+      final returned = rows.where((r) => r.status == 'returned');
+
+      final connected = await _bluetoothPrinterService.connect(printerMacAddress);
+      if (!connected) {
+        emit(state.copyWith(loading: false, error: 'Could not connect to the Bluetooth printer'));
+        return;
+      }
+      await _bluetoothPrinterService.printPeriodReport(
+        storeName: storeName,
+        from: from,
+        to: to,
+        invoiceCount: completed.length,
+        totalSales: completed.fold<double>(0, (sum, r) => sum + r.total),
+        returnCount: returned.length,
+        totalReturns: returned.fold<double>(0, (sum, r) => sum + r.total.abs()),
+        inventory: inventory,
+        currency: currency,
+        paperWidthMm: paperWidthMm,
+        languageCode: languageCode,
+      );
+      emit(state.copyWith(loading: false));
     } catch (e) {
       emit(state.copyWith(loading: false, error: e.toString()));
     }
