@@ -67,7 +67,7 @@ class BluetoothPrinterService {
   Future<List<BluetoothPrinterDevice>> pairedDevices() async {
     final granted = await ensurePermissions();
     if (!granted) return const [];
-    final devices = await PrintBluetoothThermal.pairedBluetoothDevices;
+    final devices = await PrintBluetoothThermal.pairedBluetooths;
     return devices
         .map((d) => BluetoothPrinterDevice(name: d.name, macAddress: d.macAdress))
         .toList();
