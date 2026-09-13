@@ -100,7 +100,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      'Designed & Developed by Mohammad Al Qassir  •  1st Edition  •  2026',
+                      'Designed & Developed by Mohammad Al-Qaseer | Version 1.0 - 2026',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.outline,

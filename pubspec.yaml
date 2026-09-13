@@ -51,6 +51,8 @@ dependencies:
   mobile_scanner: ^6.0.2
   uuid: ^4.5.1
   image_picker: ^1.2.1
+  print_bluetooth_thermal: ^1.1.1
+  esc_pos_utils_plus: ^2.0.4
 
 dev_dependencies:
   flutter_test:
