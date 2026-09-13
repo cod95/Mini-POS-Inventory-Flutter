@@ -145,7 +145,12 @@ class ReportsCubit extends Cubit<ReportsState> {
   /// Prints a period report: invoices sold/returned (count + total) and the
   /// remaining stock quantity for every product. Uses the currently selected
   /// date range (defaults to "from the beginning" if none is set).
-  Future<void> printPeriodReport({required String storeName, required String currency, String languageCode = 'en'}) async {
+  Future<void> printPeriodReport({
+    required String storeName,
+    required String currency,
+    String languageCode = 'en',
+    bool share = false,
+  }) async {
     emit(state.copyWith(loading: true, clearError: true));
     try {
       final from = state.from ?? DateTime(2000);
@@ -168,7 +173,11 @@ class ReportsCubit extends Cubit<ReportsState> {
         currency: currency,
         languageCode: languageCode,
       );
-      await _exportService.shareFile(file);
+      if (share) {
+        await _exportService.shareFile(file);
+      } else {
+        await _exportService.printFile(file);
+      }
       emit(state.copyWith(loading: false, lastExport: file));
     } catch (e) {
       emit(state.copyWith(loading: false, error: e.toString()));

@@ -72,6 +72,7 @@ class LocalSettingsRepository implements SettingsRepository {
       allowNegativeStock: row.allowNegativeStock,
       cashierPin: row.cashierPin,
       adminPassword: row.adminPassword,
+      lastReportReset: row.lastReportReset,
     );
   }
 
@@ -93,6 +94,7 @@ class LocalSettingsRepository implements SettingsRepository {
             allowNegativeStock: Value(settings.allowNegativeStock),
             cashierPin: Value(settings.cashierPin),
             adminPassword: Value(settings.adminPassword),
+            lastReportReset: Value(settings.lastReportReset),
           ),
         );
   }

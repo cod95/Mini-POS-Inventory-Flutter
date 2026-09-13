@@ -105,6 +105,7 @@ class AppSettingsModel extends Equatable {
     required this.allowNegativeStock,
     required this.cashierPin,
     required this.adminPassword,
+    this.lastReportReset,
   });
 
   final String storeName;
@@ -120,6 +121,7 @@ class AppSettingsModel extends Equatable {
   final bool allowNegativeStock;
   final String cashierPin;
   final String adminPassword;
+  final DateTime? lastReportReset;
 
   AppSettingsModel copyWith({
     String? storeName,
@@ -136,6 +138,7 @@ class AppSettingsModel extends Equatable {
     bool? allowNegativeStock,
     String? cashierPin,
     String? adminPassword,
+    DateTime? lastReportReset,
   }) {
     return AppSettingsModel(
       storeName: storeName ?? this.storeName,
@@ -151,6 +154,7 @@ class AppSettingsModel extends Equatable {
       allowNegativeStock: allowNegativeStock ?? this.allowNegativeStock,
       cashierPin: cashierPin ?? this.cashierPin,
       adminPassword: adminPassword ?? this.adminPassword,
+      lastReportReset: lastReportReset ?? this.lastReportReset,
     );
   }
 
@@ -168,6 +172,7 @@ class AppSettingsModel extends Equatable {
     allowNegativeStock: false,
     cashierPin: '1234',
     adminPassword: 'admin123',
+    lastReportReset: null,
   );
 
   @override
@@ -185,6 +190,7 @@ class AppSettingsModel extends Equatable {
         allowNegativeStock,
         cashierPin,
         adminPassword,
+        lastReportReset,
       ];
 }
 

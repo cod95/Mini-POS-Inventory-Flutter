@@ -18,12 +18,21 @@ class ReportsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deps = AppScope.of(context);
+    final settings = context.read<AppCubit>().state.settings;
     return BlocProvider(
-      create: (_) => ReportsCubit(
-        reportsRepository: deps.reportsRepository,
-        salesRepository: deps.salesRepository,
-        exportService: deps.fileExportService,
-      )..load(),
+      create: (_) {
+        final cubit = ReportsCubit(
+          reportsRepository: deps.reportsRepository,
+          salesRepository: deps.salesRepository,
+          exportService: deps.fileExportService,
+        );
+        if (settings.lastReportReset != null) {
+          cubit.setRange(settings.lastReportReset, DateTime.now());
+        } else {
+          cubit.load();
+        }
+        return cubit;
+      },
       child: const _ReportsView(),
     );
   }
@@ -158,21 +167,79 @@ class _ReportsView extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: state.loading
+                                    ? null
+                                    : () {
+                                        final settings = context.read<AppCubit>().state.settings;
+                                        context.read<ReportsCubit>().printPeriodReport(
+                                              storeName: settings.storeName,
+                                              currency: settings.currency,
+                                              languageCode: settings.language,
+                                            );
+                                      },
+                                icon: const Icon(Icons.print_outlined),
+                                label: Text(l10n.tr('printPeriodReport')),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: state.loading
+                                    ? null
+                                    : () {
+                                        final settings = context.read<AppCubit>().state.settings;
+                                        context.read<ReportsCubit>().printPeriodReport(
+                                              storeName: settings.storeName,
+                                              currency: settings.currency,
+                                              languageCode: settings.language,
+                                              share: true,
+                                            );
+                                      },
+                                icon: const Icon(Icons.share_outlined),
+                                label: Text(l10n.tr('sharePdf')),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
                         SizedBox(
                           width: double.infinity,
-                          child: FilledButton.icon(
+                          child: TextButton.icon(
                             onPressed: state.loading
                                 ? null
-                                : () {
-                                    final settings = context.read<AppCubit>().state.settings;
-                                    context.read<ReportsCubit>().printPeriodReport(
-                                          storeName: settings.storeName,
-                                          currency: settings.currency,
-                                          languageCode: settings.language,
-                                        );
+                                : () async {
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: Text(l10n.tr('resetReports')),
+                                        content: Text(l10n.tr('resetReportsConfirm')),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(ctx).pop(false),
+                                            child: Text(l10n.tr('cancel')),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () => Navigator.of(ctx).pop(true),
+                                            child: Text(l10n.tr('resetReports')),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirmed != true || !context.mounted) return;
+                                    final now = DateTime.now();
+                                    final appCubit = context.read<AppCubit>();
+                                    await appCubit.updateSettings(
+                                      appCubit.state.settings.copyWith(lastReportReset: now),
+                                    );
+                                    if (!context.mounted) return;
+                                    await context.read<ReportsCubit>().setRange(now, now);
                                   },
-                            icon: const Icon(Icons.summarize_outlined),
-                            label: Text(l10n.tr('printPeriodReport')),
+                            icon: const Icon(Icons.restart_alt),
+                            label: Text(l10n.tr('resetReports')),
                           ),
                         ),
                       ],

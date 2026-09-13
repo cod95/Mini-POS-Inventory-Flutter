@@ -347,6 +347,7 @@ class _ProductsView extends StatelessWidget {
     int? categoryId = existing?.categoryId;
     var categories = List<CategoryModel>.of(state.categories);
     String? pickedImagePath = existing?.imagePath;
+    bool isTaxable = existing?.taxable ?? false;
 
     final picker = ImagePicker();
 
@@ -487,15 +488,15 @@ class _ProductsView extends StatelessWidget {
                     AppTextField(controller: barcode, label: 'Barcode'),
                     const SizedBox(height: AppSpacing.sm),
                     AppDropdown<int?>(
-                      label: 'Category',
+                      label: context.l10n.tr('fieldCategory'),
                       value: categoryId,
                       items: [
-                        const DropdownMenuItem<int?>(value: null, child: Text('No category')),
+                        DropdownMenuItem<int?>(value: null, child: Text(context.l10n.tr('noCategory'))),
                         ...categories
                             .map((c) => DropdownMenuItem<int?>(value: c.id, child: Text(c.name))),
-                        const DropdownMenuItem<int?>(
+                        DropdownMenuItem<int?>(
                           value: _addCategorySentinel,
-                          child: Text('+ إضافة قسم جديد…'),
+                          child: Text('+ ${context.l10n.tr('newCategoryName')}'),
                         ),
                       ],
                       onChanged: (value) async {
@@ -511,6 +512,13 @@ class _ProductsView extends StatelessWidget {
                         }
                         setState(() => categoryId = value);
                       },
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(context.l10n.tr('tva')),
+                      value: isTaxable,
+                      onChanged: (value) => setState(() => isTaxable = value),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Row(
@@ -584,6 +592,7 @@ class _ProductsView extends StatelessWidget {
                           unit: unit.text.trim().isEmpty ? 'piece' : unit.text.trim(),
                           notes: notes.text.trim().isEmpty ? null : notes.text.trim(),
                           imagePath: pickedImagePath,
+                          taxable: isTaxable,
                         );
                         await cubit.saveProduct(input);
                         if (context.mounted) Navigator.of(context).pop();

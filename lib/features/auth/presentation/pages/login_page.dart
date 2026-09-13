@@ -38,11 +38,15 @@ class _LoginPageState extends State<LoginPage> {
         }
       },
       child: Scaffold(
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.xl),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.xl),
@@ -81,7 +85,32 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-            ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.xl),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 1,
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Designed & Developed by Mohammad Al Qassir  •  1st Edition  •  2026',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.outline,
+                            letterSpacing: 0.3,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

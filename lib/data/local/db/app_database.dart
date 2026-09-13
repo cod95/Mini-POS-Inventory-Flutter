@@ -177,6 +177,11 @@ class AppSettings extends Table {
   /// Shown under the store name (settings + receipt).
   TextColumn get storePhone => text().nullable()();
 
+  /// When the store owner last "closed out" the reports/invoice log (a
+  /// Z-report style reset). Reports and the invoice list default to
+  /// showing only sales from this point forward until changed again.
+  DateTimeColumn get lastReportReset => dateTime().nullable()();
+
   /// The main currency products are priced in and sold with (e.g. 'USD').
   TextColumn get currency => text().withDefault(const Constant('USD'))();
 
@@ -227,7 +232,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -249,6 +254,9 @@ class AppDatabase extends _$AppDatabase {
           if (from < 5) {
             await m.addColumn(products, products.taxable);
             await m.addColumn(saleItems, saleItems.taxable);
+          }
+          if (from < 6) {
+            await m.addColumn(appSettings, appSettings.lastReportReset);
           }
         },
       );

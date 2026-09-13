@@ -106,14 +106,24 @@ class ProductsCubit extends Cubit<ProductsState> {
     }
   }
 
-  /// Adds a new category and returns its new id (or null if the name was
+  /// Adds a new category and returns its id (or null if the name was
   /// empty). Used both by the category-manager sheet and by the inline
   /// "add new category" option in the product editor's category dropdown.
+  /// If a category with that name already exists, its existing id is
+  /// returned instead of failing silently.
   Future<int?> saveCategory(String name) async {
-    if (name.trim().isEmpty) return null;
-    final id = await _productRepository.addCategory(name.trim());
-    await load();
-    return id;
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return null;
+    for (final c in state.categories) {
+      if (c.name.toLowerCase() == trimmed.toLowerCase()) return c.id;
+    }
+    try {
+      final id = await _productRepository.addCategory(trimmed);
+      await load();
+      return id;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Returns null on success, or a user-facing error message on failure
