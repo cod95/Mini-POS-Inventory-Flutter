@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:arabic_reshaper/arabic_reshaper.dart';
 import 'package:csv/csv.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -99,8 +98,6 @@ class FileExportService {
     final arabicFont = await PdfGoogleFonts.notoNaskhArabicRegular();
     final theme = pw.ThemeData.withFont(base: arabicFont, bold: arabicFont, fontFallback: [arabicFont]);
 
-    String shape(String text) => ArabicReshaper.instance.reshape(text);
-
     String fmtDate(DateTime d) => d.toIso8601String().substring(0, 10);
 
     final doc = pw.Document(theme: theme);
@@ -110,23 +107,23 @@ class FileExportService {
         textDirection: isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr,
         build: (context) => [
           pw.Center(
-            child: pw.Text(shape(storeName), style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            child: pw.Text(storeName, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
           ),
-          pw.Center(child: pw.Text(shape(t['title']!), style: const pw.TextStyle(fontSize: 13))),
+          pw.Center(child: pw.Text(t['title']!, style: const pw.TextStyle(fontSize: 13))),
           pw.SizedBox(height: 4),
-          pw.Center(child: pw.Text(shape('${t['period']}: ${fmtDate(from)} → ${fmtDate(to)}'))),
+          pw.Center(child: pw.Text('${t['period']}: ${fmtDate(from)} → ${fmtDate(to)}')),
           pw.SizedBox(height: 14),
           pw.Table(
             border: pw.TableBorder.all(width: 0.5),
             children: [
-              _summaryRow(shape(t['invoicesSold']!), '$invoiceCount'),
-              _summaryRow(shape(t['totalSales']!), '${totalSales.toStringAsFixed(2)} $currency'),
-              _summaryRow(shape(t['invoicesReturned']!), '$returnCount'),
-              _summaryRow(shape(t['totalReturns']!), '${totalReturns.toStringAsFixed(2)} $currency'),
+              _summaryRow(t['invoicesSold']!, '$invoiceCount'),
+              _summaryRow(t['totalSales']!, '${totalSales.toStringAsFixed(2)} $currency'),
+              _summaryRow(t['invoicesReturned']!, '$returnCount'),
+              _summaryRow(t['totalReturns']!, '${totalReturns.toStringAsFixed(2)} $currency'),
             ],
           ),
           pw.SizedBox(height: 16),
-          pw.Text(shape(t['inventory']!), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+          pw.Text(t['inventory']!, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 6),
           pw.Table(
             border: pw.TableBorder.all(width: 0.5),
@@ -136,18 +133,18 @@ class FileExportService {
                 children: [
                   pw.Padding(
                     padding: const pw.EdgeInsets.all(4),
-                    child: pw.Text(shape(t['product']!), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    child: pw.Text(t['product']!, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                   ),
                   pw.Padding(
                     padding: const pw.EdgeInsets.all(4),
-                    child: pw.Text(shape(t['stock']!), style: pw.TextStyle(fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+                    child: pw.Text(t['stock']!, style: pw.TextStyle(fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
                   ),
                 ],
               ),
               ...inventory.map(
                 (row) => pw.TableRow(
                   children: [
-                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(shape(row.name))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(row.name)),
                     pw.Padding(
                       padding: const pw.EdgeInsets.all(4),
                       child: pw.Text('${row.stock}', textAlign: pw.TextAlign.center),

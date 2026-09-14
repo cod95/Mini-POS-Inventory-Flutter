@@ -485,7 +485,20 @@ class _ProductsView extends StatelessWidget {
                     const SizedBox(height: AppSpacing.sm),
                     AppTextField(controller: sku, label: 'SKU'),
                     const SizedBox(height: AppSpacing.sm),
-                    AppTextField(controller: barcode, label: 'Barcode'),
+                    AppTextField(
+                      controller: barcode,
+                      label: 'Barcode',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.camera_alt_outlined),
+                        tooltip: 'Scan barcode',
+                        onPressed: () async {
+                          final scanned = await AppScope.of(context).barcodeScannerService.scanBarcode();
+                          if (scanned != null && scanned.trim().isNotEmpty) {
+                            barcode.text = scanned.trim();
+                          }
+                        },
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.sm),
                     AppDropdown<int?>(
                       label: context.l10n.tr('fieldCategory'),
