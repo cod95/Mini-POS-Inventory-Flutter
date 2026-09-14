@@ -1,3 +1,4 @@
+import 'package:arabic_reshaper/arabic_reshaper.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
@@ -51,6 +52,10 @@ class BluetoothPrinterService {
   };
 
   Map<String, String> _t(String languageCode) => _labels[languageCode] ?? _labels['en']!;
+
+  /// Same rationale as the PDF receipt: ESC/POS printers don't join Arabic
+  /// letters into their connected forms either, so reshape before sending.
+  String _shape(String text) => ArabicReshaper.instance.reshape(text);
 
   /// Requests the Bluetooth permissions Android 12+ needs before any scan
   /// or connect call. Safe to call every time — it's a no-op once granted.
@@ -108,17 +113,17 @@ class BluetoothPrinterService {
         : sale.customerName!.trim();
 
     bytes.addAll(generator.text(
-      storeName,
+      _shape(storeName),
       styles: const PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2),
     ));
     if (storePhone != null && storePhone.trim().isNotEmpty) {
-      bytes.addAll(generator.text(storePhone.trim(), styles: const PosStyles(align: PosAlign.center)));
+      bytes.addAll(generator.text(_shape(storePhone.trim()), styles: const PosStyles(align: PosAlign.center)));
     }
-    bytes.addAll(generator.text(header, styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.text(_shape(header), styles: const PosStyles(align: PosAlign.center)));
     bytes.addAll(generator.hr());
-    bytes.addAll(generator.text('${t['invoice']}: ${sale.invoiceNo}'));
+    bytes.addAll(generator.text(_shape('${t['invoice']}: ${sale.invoiceNo}')));
     bytes.addAll(generator.text(sale.createdAt.toString().substring(0, 16)));
-    bytes.addAll(generator.text('${t['customer']}: $customerLabel'));
+    bytes.addAll(generator.text(_shape('${t['customer']}: $customerLabel')));
     bytes.addAll(generator.hr());
     bytes.addAll(
       generator.row([
@@ -129,7 +134,7 @@ class BluetoothPrinterService {
       ]),
     );
     for (final item in items) {
-      final name = item.taxable ? '${item.nameSnapshot} [TVA]' : item.nameSnapshot;
+      final name = _shape(item.taxable ? '${item.nameSnapshot} [TVA]' : item.nameSnapshot);
       bytes.addAll(
         generator.row([
           PosColumn(text: name, width: 5),
@@ -148,19 +153,19 @@ class BluetoothPrinterService {
       );
     }
     bytes.addAll(generator.hr());
-    bytes.addAll(_totalRow(generator, t['totalUsd']!, '${preTaxTotal.toStringAsFixed(2)} USD'));
-    bytes.addAll(_totalRow(generator, t['totalLbp']!, '${(preTaxTotal * exchangeRate).toStringAsFixed(0)} LBP'));
+    bytes.addAll(_totalRow(generator, _shape(t['totalUsd']!), '${preTaxTotal.toStringAsFixed(2)} USD'));
+    bytes.addAll(_totalRow(generator, _shape(t['totalLbp']!), '${(preTaxTotal * exchangeRate).toStringAsFixed(0)} LBP'));
     if (sale.taxTotal > 0) {
       bytes.addAll(_totalRow(
         generator,
-        t['totalAfterTax']!,
+        _shape(t['totalAfterTax']!),
         '${toMain(sale.total).toStringAsFixed(currencyDecimals)} $currency',
         bold: true,
       ));
     }
-    bytes.addAll(_totalRow(generator, t['itemCount']!, '$itemCount'));
+    bytes.addAll(_totalRow(generator, _shape(t['itemCount']!), '$itemCount'));
     bytes.addAll(generator.feed(1));
-    bytes.addAll(generator.text(footer, styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.text(_shape(footer), styles: const PosStyles(align: PosAlign.center)));
     bytes.addAll(generator.feed(2));
     bytes.addAll(generator.cut());
 
@@ -188,21 +193,21 @@ class BluetoothPrinterService {
     String fmtDate(DateTime d) => d.toIso8601String().substring(0, 10);
 
     bytes.addAll(generator.text(
-      storeName,
+      _shape(storeName),
       styles: const PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2),
     ));
-    bytes.addAll(generator.text(t['title']!, styles: const PosStyles(align: PosAlign.center)));
-    bytes.addAll(generator.text('${t['period']}: ${fmtDate(from)} - ${fmtDate(to)}', styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.text(_shape(t['title']!), styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.text(_shape('${t['period']}: ${fmtDate(from)} - ${fmtDate(to)}'), styles: const PosStyles(align: PosAlign.center)));
     bytes.addAll(generator.hr());
-    bytes.addAll(_totalRow(generator, t['invoicesSold']!, '$invoiceCount'));
-    bytes.addAll(_totalRow(generator, t['totalSales']!, '${totalSales.toStringAsFixed(2)} $currency'));
-    bytes.addAll(_totalRow(generator, t['invoicesReturned']!, '$returnCount'));
-    bytes.addAll(_totalRow(generator, t['totalReturns']!, '${totalReturns.toStringAsFixed(2)} $currency'));
+    bytes.addAll(_totalRow(generator, _shape(t['invoicesSold']!), '$invoiceCount'));
+    bytes.addAll(_totalRow(generator, _shape(t['totalSales']!), '${totalSales.toStringAsFixed(2)} $currency'));
+    bytes.addAll(_totalRow(generator, _shape(t['invoicesReturned']!), '$returnCount'));
+    bytes.addAll(_totalRow(generator, _shape(t['totalReturns']!), '${totalReturns.toStringAsFixed(2)} $currency'));
     bytes.addAll(generator.hr());
     for (final row in inventory) {
       bytes.addAll(
         generator.row([
-          PosColumn(text: row.name, width: 9),
+          PosColumn(text: _shape(row.name), width: 9),
           PosColumn(text: '${row.stock}', width: 3, styles: const PosStyles(align: PosAlign.right)),
         ]),
       );

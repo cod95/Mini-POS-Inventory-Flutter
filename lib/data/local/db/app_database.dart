@@ -201,7 +201,7 @@ class AppSettings extends Table {
 
   BoolColumn get taxEnabled => boolean().withDefault(const Constant(false))();
 
-  RealColumn get taxRate => real().withDefault(const Constant(0.14))();
+  RealColumn get taxRate => real().withDefault(const Constant(0.11))();
 
   TextColumn get receiptHeader => text().withDefault(const Constant('Thank you!'))();
 

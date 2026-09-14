@@ -114,7 +114,7 @@ abstract class SalesRepository {
 }
 
 abstract class ReportsRepository {
-  Future<DashboardMetrics> getDashboardMetrics();
+  Future<DashboardMetrics> getDashboardMetrics({DateTime? since});
 
   Future<List<SalesByProductMetric>> salesByProduct({DateTime? from, DateTime? to});
 

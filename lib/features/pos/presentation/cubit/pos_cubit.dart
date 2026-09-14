@@ -27,7 +27,7 @@ class PosState extends Equatable {
     this.paymentMethod = PaymentMethod.cash,
     this.orderDiscount = 0,
     this.taxEnabled = false,
-    this.taxRate = 0.14,
+    this.taxRate = 0.11,
     this.paid = 0,
     this.lastResult,
     this.receiptProcessing = false,

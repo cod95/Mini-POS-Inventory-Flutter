@@ -375,9 +375,13 @@ class LocalSalesRepository implements SalesRepository {
       final subtotal = MoneyCalculator.subtotal(lineTotals);
       final itemDiscountTotal =
           MoneyCalculator.round2(input.items.fold(0, (sum, item) => sum + item.discount));
-      // TVA applies only to items individually marked taxable.
+      // TVA applies only to items individually marked taxable. Use the
+      // product's CURRENT taxable flag from the database (productById, just
+      // fetched above) rather than the cart's snapshot — the cart item may
+      // have been added before the product's TVA toggle was last changed,
+      // which would otherwise silently under/over-tax the sale.
       final taxableSubtotal = MoneyCalculator.round2(
-        input.items.where((item) => item.taxable).fold<double>(
+        input.items.where((item) => productById[item.productId]?.taxable ?? item.taxable).fold<double>(
               0,
               (sum, item) => sum +
                   MoneyCalculator.lineTotal(
@@ -440,7 +444,7 @@ class LocalSalesRepository implements SalesRepository {
                 qty: item.qty,
                 discount: Value(item.discount),
                 lineTotal: lineTotals[i],
-                taxable: Value(item.taxable),
+                taxable: Value(product.taxable),
               ),
             );
 
@@ -709,9 +713,12 @@ class LocalReportsRepository implements ReportsRepository {
   final ProductRepository _productRepository;
 
   @override
-  Future<DashboardMetrics> getDashboardMetrics() async {
-    final sales = await _db.select(_db.sales).get();
-    final items = await _db.select(_db.saleItems).get();
+  Future<DashboardMetrics> getDashboardMetrics({DateTime? since}) async {
+    final allSales = await _db.select(_db.sales).get();
+    final sales = since == null ? allSales : allSales.where((s) => !s.createdAt.isBefore(since)).toList();
+    final saleIds = sales.map((e) => e.id).toSet();
+    final allItems = await _db.select(_db.saleItems).get();
+    final items = allItems.where((item) => saleIds.contains(item.saleId)).toList();
 
     final now = DateTime.now();
     bool isToday(DateTime date) =>

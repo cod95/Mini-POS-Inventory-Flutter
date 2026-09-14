@@ -177,7 +177,7 @@ class AppSettingsModel extends Equatable {
     secondaryCurrencyCode: 'LBP',
     exchangeRate: 89000,
     taxEnabled: false,
-    taxRate: 0.14,
+    taxRate: 0.11,
     receiptHeader: 'Thank you!',
     receiptFooter: 'Visit us again',
     language: 'en',

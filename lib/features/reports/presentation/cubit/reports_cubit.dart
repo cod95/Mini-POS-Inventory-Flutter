@@ -20,6 +20,7 @@ class ReportsState extends Equatable {
     this.lowStockProducts = const [],
     this.from,
     this.to,
+    this.resetSince,
     this.lastExport,
   });
 
@@ -31,6 +32,7 @@ class ReportsState extends Equatable {
   final List<ProductView> lowStockProducts;
   final DateTime? from;
   final DateTime? to;
+  final DateTime? resetSince;
   final File? lastExport;
 
   ReportsState copyWith({
@@ -44,6 +46,7 @@ class ReportsState extends Equatable {
     DateTime? from,
     DateTime? to,
     bool clearDates = false,
+    DateTime? resetSince,
     File? lastExport,
   }) {
     return ReportsState(
@@ -55,6 +58,7 @@ class ReportsState extends Equatable {
       lowStockProducts: lowStockProducts ?? this.lowStockProducts,
       from: clearDates ? null : from ?? this.from,
       to: clearDates ? null : to ?? this.to,
+      resetSince: resetSince ?? this.resetSince,
       lastExport: lastExport ?? this.lastExport,
     );
   }
@@ -69,6 +73,7 @@ class ReportsState extends Equatable {
         lowStockProducts,
         from,
         to,
+        resetSince,
         lastExport,
       ];
 }
@@ -93,7 +98,7 @@ class ReportsCubit extends Cubit<ReportsState> {
   Future<void> load() async {
     emit(state.copyWith(loading: true, clearError: true));
     try {
-      final dashboard = await _reportsRepository.getDashboardMetrics();
+      final dashboard = await _reportsRepository.getDashboardMetrics(since: state.resetSince);
       final salesByProduct =
           await _reportsRepository.salesByProduct(from: state.from, to: state.to);
       final lowStock = await _reportsRepository.lowStockProducts();
@@ -119,6 +124,14 @@ class ReportsCubit extends Cubit<ReportsState> {
 
   Future<void> setRange(DateTime? from, DateTime? to) async {
     emit(state.copyWith(from: from, to: to));
+    await load();
+  }
+
+  /// Applies the "reports reset" point (a Z-report style close-out): the
+  /// dashboard's today/month figures, the invoice log, and reports all
+  /// start counting fresh from this moment on.
+  Future<void> applyResetSince(DateTime resetSince) async {
+    emit(state.copyWith(resetSince: resetSince, from: resetSince, to: DateTime.now()));
     await load();
   }
 

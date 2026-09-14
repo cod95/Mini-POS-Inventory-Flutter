@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:arabic_reshaper/arabic_reshaper.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -55,6 +56,11 @@ class ReceiptPdfService {
   Future<pw.Font> _loadArabicFont() async {
     return _arabicFont ??= await PdfGoogleFonts.notoNaskhArabicRegular();
   }
+
+  /// The `pdf` package doesn't reshape Arabic letters into their connected
+  /// forms on its own, which is what makes Arabic text look broken/garbled
+  /// in the PDF. Run every piece of text through this before rendering it.
+  String _shape(String text) => ArabicReshaper.instance.reshape(text);
 
   Future<File> generateReceipt({
     required SaleView sale,
@@ -124,16 +130,16 @@ class ReceiptPdfService {
             children: [
               // Store name + phone number right under it.
               pw.Center(
-                child: pw.Text(storeName, style: style(size: _titleFontSize, bold: true)),
+                child: pw.Text(_shape(storeName), style: style(size: _titleFontSize, bold: true)),
               ),
               if (storePhone != null && storePhone.trim().isNotEmpty)
-                pw.Center(child: pw.Text(storePhone.trim(), style: style())),
+                pw.Center(child: pw.Text(_shape(storePhone.trim()), style: style())),
               pw.SizedBox(height: 3),
-              pw.Center(child: pw.Text(header, style: style())),
+              pw.Center(child: pw.Text(_shape(header), style: style())),
               pw.SizedBox(height: 6),
-              pw.Text('${t['invoice']}: ${sale.invoiceNo}', style: style()),
+              pw.Text(_shape('${t['invoice']}: ${sale.invoiceNo}'), style: style()),
               pw.Text(sale.createdAt.toString().substring(0, 16), style: style()),
-              pw.Text('${t['customer']}: $customerLabel', style: style()),
+              pw.Text(_shape('${t['customer']}: $customerLabel'), style: style()),
               pw.SizedBox(height: 4),
               pw.Divider(thickness: 0.6),
               // Header row: item | qty | price | total — always English,
@@ -169,7 +175,7 @@ class ReceiptPdfService {
                         child: pw.Wrap(
                           crossAxisAlignment: pw.WrapCrossAlignment.center,
                           children: [
-                            pw.Text(item.nameSnapshot, style: style()),
+                            pw.Text(_shape(item.nameSnapshot), style: style()),
                             if (item.taxable) ...[
                               pw.SizedBox(width: 3),
                               pw.Container(
@@ -218,7 +224,7 @@ class ReceiptPdfService {
                 _totalLine(t['totalAfterTax']!, fmtMain(sale.total), style, bold: true),
               _totalLine(t['itemCount']!, '$itemCount', style),
               pw.SizedBox(height: 8),
-              pw.Center(child: pw.Text(footer, style: style())),
+              pw.Center(child: pw.Text(_shape(footer), style: style())),
             ],
           );
         },
@@ -243,7 +249,7 @@ class ReceiptPdfService {
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text('$label:', style: style(bold: bold)),
+          pw.Text(_shape('$label:'), style: style(bold: bold)),
           pw.Text(value, style: style(bold: bold)),
         ],
       ),

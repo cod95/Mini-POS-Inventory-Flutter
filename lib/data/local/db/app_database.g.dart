@@ -3748,7 +3748,7 @@ class $AppSettingsTable extends AppSettings
     false,
     type: DriftSqlType.double,
     requiredDuringInsert: false,
-    defaultValue: const Constant(0.14),
+    defaultValue: const Constant(0.11),
   );
   static const VerificationMeta _receiptHeaderMeta = const VerificationMeta(
     'receiptHeader',

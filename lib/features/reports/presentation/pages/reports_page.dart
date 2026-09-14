@@ -28,7 +28,7 @@ class ReportsPage extends StatelessWidget {
           bluetoothPrinterService: deps.bluetoothPrinterService,
         );
         if (settings.lastReportReset != null) {
-          cubit.setRange(settings.lastReportReset, DateTime.now());
+          cubit.applyResetSince(settings.lastReportReset!);
         } else {
           cubit.load();
         }
@@ -259,7 +259,7 @@ class _ReportsView extends StatelessWidget {
                                       appCubit.state.settings.copyWith(lastReportReset: now),
                                     );
                                     if (!context.mounted) return;
-                                    await context.read<ReportsCubit>().setRange(now, now);
+                                    await context.read<ReportsCubit>().applyResetSince(now);
                                   },
                             icon: const Icon(Icons.restart_alt),
                             label: Text(l10n.tr('resetReports')),
