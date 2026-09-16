@@ -50,6 +50,12 @@ class ReceiptPdfService {
   static const double _headerFontSize = 8;
   static const double _titleFontSize = 13;
 
+  // Matches any Arabic-script codepoint, basic block + presentation forms.
+  static final RegExp _arabicPattern =
+      RegExp(r'[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]');
+
+  static bool _hasArabic(String text) => _arabicPattern.hasMatch(text);
+
   /// Fetched once per app run and reused for every receipt after that.
   pw.Font? _arabicFont;
 
@@ -57,15 +63,27 @@ class ReceiptPdfService {
     return _arabicFont ??= await PdfGoogleFonts.notoNaskhArabicRegular();
   }
 
-  /// The `pdf` package already reorders RTL text runs on its own (it has
-  /// its own bidi pass), but it does NOT join Arabic letters into their
-  /// correct connected presentation forms — that's a separate step
-  /// (contextual shaping), which is all this does. It substitutes each
-  /// letter in place for its correct joined glyph without moving any
-  /// characters around, so it composes safely with pdf's own reordering
-  /// instead of fighting it. Works for any Arabic text, mixed with
-  /// numbers/Latin on the same line, regardless of the invoice language.
-  String _shape(String text) => ArabicReshaper.instance.reshape(text);
+  /// `arabic_reshaper` joins Arabic letters into their correct connected
+  /// presentation forms, but it does NOT reorder anything — it keeps the
+  /// characters in logical (reading) order. The `pdf` package does not
+  /// reliably auto-detect and reorder an embedded Arabic run inside a
+  /// paragraph, so instead of relying on that, each piece of text picks
+  /// its OWN direction here based on whether it actually contains Arabic —
+  /// independent of the invoice's overall language. That's what lets store
+  /// name, item names, and labels each be Arabic or Latin in any
+  /// combination and still render correctly.
+  pw.Widget _shapedText(
+    String text,
+    pw.TextStyle style, {
+    pw.TextAlign? textAlign,
+  }) {
+    final isArabic = _hasArabic(text);
+    final content = isArabic ? ArabicReshaper.instance.reshape(text) : text;
+    return pw.Directionality(
+      textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+      child: pw.Text(content, style: style, textAlign: textAlign),
+    );
+  }
 
   Future<File> generateReceipt({
     required SaleView sale,
@@ -127,9 +145,8 @@ class ReceiptPdfService {
           marginTop: 8,
           marginBottom: 8,
         ),
-        // Always LTR at the page level — pdf's own bidi pass reorders any
-        // embedded Arabic run correctly on its own; forcing the whole page
-        // RTL here would double up with that and scramble the shaped text.
+        // Always LTR at the page level. Direction is decided per piece of
+        // text instead (see _shapedText) — see the comment on that method.
         textDirection: pw.TextDirection.ltr,
         build: (context) {
           return pw.Column(
@@ -137,16 +154,29 @@ class ReceiptPdfService {
             children: [
               // Store name + phone number right under it.
               pw.Center(
-                child: pw.Text(_shape(storeName), style: style(size: _titleFontSize, bold: true)),
+                child: _shapedText(storeName, style(size: _titleFontSize, bold: true)),
               ),
               if (storePhone != null && storePhone.trim().isNotEmpty)
-                pw.Center(child: pw.Text(_shape(storePhone.trim()), style: style())),
+                pw.Center(child: _shapedText(storePhone.trim(), style())),
               pw.SizedBox(height: 3),
-              pw.Center(child: pw.Text(_shape(header), style: style())),
+              pw.Center(child: _shapedText(header, style())),
               pw.SizedBox(height: 6),
-              pw.Text(_shape('${t['invoice']}: ${sale.invoiceNo}'), style: style()),
+              pw.Row(
+                children: [
+                  _shapedText('${t['invoice']!}: ', style()),
+                  // The invoice number itself is always plain Latin/digits
+                  // (INV-YYYYMMDD-XXXX), kept as its own text so it never
+                  // gets caught up in the label's direction.
+                  _shapedText(sale.invoiceNo, style()),
+                ],
+              ),
               pw.Text(sale.createdAt.toString().substring(0, 16), style: style()),
-              pw.Text(_shape('${t['customer']}: $customerLabel'), style: style()),
+              pw.Row(
+                children: [
+                  _shapedText('${t['customer']!}: ', style()),
+                  _shapedText(customerLabel, style()),
+                ],
+              ),
               pw.SizedBox(height: 4),
               pw.Divider(thickness: 0.6),
               // Header row: item | qty | price | total — always English,
@@ -182,7 +212,7 @@ class ReceiptPdfService {
                         child: pw.Wrap(
                           crossAxisAlignment: pw.WrapCrossAlignment.center,
                           children: [
-                            pw.Text(_shape(item.nameSnapshot), style: style()),
+                            _shapedText(item.nameSnapshot, style()),
                             if (item.taxable) ...[
                               pw.SizedBox(width: 3),
                               pw.Container(
@@ -231,7 +261,7 @@ class ReceiptPdfService {
                 _totalLine(t['totalAfterTax']!, fmtMain(sale.total), style, bold: true),
               _totalLine(t['itemCount']!, '$itemCount', style),
               pw.SizedBox(height: 8),
-              pw.Center(child: pw.Text(_shape(footer), style: style())),
+              pw.Center(child: _shapedText(footer, style())),
             ],
           );
         },
@@ -256,7 +286,7 @@ class ReceiptPdfService {
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(_shape('$label:'), style: style(bold: bold)),
+          _shapedText('$label:', style(bold: bold)),
           pw.Text(value, style: style(bold: bold)),
         ],
       ),
