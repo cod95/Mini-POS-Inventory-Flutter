@@ -17,34 +17,23 @@ class ReceiptPdfService {
 
   final PrinterService _printerService;
 
-  // Column headers are always shown in English regardless of the app
-  // language, per how the receipt should read — this keeps the table
-  // compact and never lets a header wrap onto two lines.
+  // Everything below is fixed receipt "chrome" (labels/column headers) and
+  // is ALWAYS shown in English, regardless of the app's UI language —
+  // only real entered data (store name, item names, customer name) adapts
+  // to whatever language it's actually written in. `languageCode` is kept
+  // as a parameter for call-site compatibility but is intentionally unused
+  // now that no label depends on it.
   static const _colItem = 'Item';
   static const _colQty = 'Qty';
   static const _colPrice = 'Price';
   static const _colTotal = 'Total';
-
-  static const Map<String, Map<String, String>> _labels = {
-    'en': {
-      'invoice': 'Invoice',
-      'customer': 'Customer',
-      'noName': 'No name',
-      'totalUsd': 'Total (USD)',
-      'totalLbp': 'Total (LBP)',
-      'totalAfterTax': 'Total after TVA',
-      'itemCount': 'Item count',
-    },
-    'ar': {
-      'invoice': 'رقم الفاتورة',
-      'customer': 'الزبون',
-      'noName': 'بدون اسم',
-      'totalUsd': 'المجموع بالدولار',
-      'totalLbp': 'المجموع باللبناني',
-      'totalAfterTax': 'المجموع بعد TVA',
-      'itemCount': 'عدد الأصناف',
-    },
-  };
+  static const _lblInvoice = 'Invoice:';
+  static const _lblCustomer = 'Customer:';
+  static const _lblNoName = 'No name';
+  static const _lblTotalUsd = 'Total (USD):';
+  static const _lblTotalLbp = 'Total (LBP):';
+  static const _lblTotalAfterTax = 'Total after TVA:';
+  static const _lblItemCount = 'Item count:';
 
   static const double _baseFontSize = 8.5;
   static const double _headerFontSize = 8;
@@ -67,11 +56,10 @@ class ReceiptPdfService {
   /// presentation forms, but it does NOT reorder anything — it keeps the
   /// characters in logical (reading) order. The `pdf` package does not
   /// reliably auto-detect and reorder an embedded Arabic run inside a
-  /// paragraph, so instead of relying on that, each piece of text picks
-  /// its OWN direction here based on whether it actually contains Arabic —
-  /// independent of the invoice's overall language. That's what lets store
-  /// name, item names, and labels each be Arabic or Latin in any
-  /// combination and still render correctly.
+  /// paragraph, so instead of relying on that, each piece of DATA text
+  /// (store name, item name, customer name, header/footer) picks its OWN
+  /// direction here based on whether it actually contains Arabic. Fixed
+  /// labels never go through this — they're plain English literals.
   pw.Widget _shapedText(
     String text,
     pw.TextStyle style, {
@@ -97,9 +85,6 @@ class ReceiptPdfService {
     required bool taxEnabled,
     String languageCode = 'en',
   }) async {
-    final lang = _labels.containsKey(languageCode) ? languageCode : 'en';
-    final t = _labels[lang]!;
-
     final arabicFont = await _loadArabicFont();
     final theme = pw.ThemeData.withFont(
       base: arabicFont,
@@ -109,7 +94,7 @@ class ReceiptPdfService {
 
     final customerLabel =
         (sale.customerName == null || sale.customerName!.trim().isEmpty)
-            ? t['noName']!
+            ? _lblNoName
             : sale.customerName!.trim();
 
     // sale.total / priceSnapshot / lineTotal are always stored in USD.
@@ -145,8 +130,8 @@ class ReceiptPdfService {
           marginTop: 8,
           marginBottom: 8,
         ),
-        // Always LTR at the page level. Direction is decided per piece of
-        // text instead (see _shapedText) — see the comment on that method.
+        // Always LTR at the page level. Labels are always English (LTR by
+        // nature); data text picks its own direction via _shapedText.
         textDirection: pw.TextDirection.ltr,
         build: (context) {
           return pw.Column(
@@ -161,22 +146,9 @@ class ReceiptPdfService {
               pw.SizedBox(height: 3),
               pw.Center(child: _shapedText(header, style())),
               pw.SizedBox(height: 6),
-              pw.Row(
-                children: [
-                  _shapedText('${t['invoice']!}: ', style()),
-                  // The invoice number itself is always plain Latin/digits
-                  // (INV-YYYYMMDD-XXXX), kept as its own text so it never
-                  // gets caught up in the label's direction.
-                  _shapedText(sale.invoiceNo, style()),
-                ],
-              ),
+              _labeledLine(_lblInvoice, sale.invoiceNo, style),
               pw.Text(sale.createdAt.toString().substring(0, 16), style: style()),
-              pw.Row(
-                children: [
-                  _shapedText('${t['customer']!}: ', style()),
-                  _shapedText(customerLabel, style()),
-                ],
-              ),
+              _labeledLine(_lblCustomer, customerLabel, style),
               pw.SizedBox(height: 4),
               pw.Divider(thickness: 0.6),
               // Header row: item | qty | price | total — always English,
@@ -255,11 +227,11 @@ class ReceiptPdfService {
               pw.Divider(thickness: 0.6),
               // Totals: pre-tax amount in both currencies, then the final
               // tax-inclusive total (only when TVA applies), then item count.
-              _totalLine(t['totalUsd']!, fmtUsd(preTaxTotal), style),
-              _totalLine(t['totalLbp']!, fmtLbp(preTaxTotal), style),
+              _totalLine(_lblTotalUsd, fmtUsd(preTaxTotal), style),
+              _totalLine(_lblTotalLbp, fmtLbp(preTaxTotal), style),
               if (sale.taxTotal > 0)
-                _totalLine(t['totalAfterTax']!, fmtMain(sale.total), style, bold: true),
-              _totalLine(t['itemCount']!, '$itemCount', style),
+                _totalLine(_lblTotalAfterTax, fmtMain(sale.total), style, bold: true),
+              _totalLine(_lblItemCount, '$itemCount', style),
               pw.SizedBox(height: 8),
               pw.Center(child: _shapedText(footer, style())),
             ],
@@ -275,6 +247,23 @@ class ReceiptPdfService {
     return file;
   }
 
+  /// A fixed-English label followed by a value that may be Arabic or
+  /// Latin — the label never changes side or shape; only the value adapts.
+  pw.Widget _labeledLine(
+    String label,
+    String value,
+    pw.TextStyle Function({double? size, bool bold}) style,
+  ) {
+    return pw.Row(
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        pw.Text(label, style: style()),
+        pw.SizedBox(width: 4),
+        _shapedText(value, style()),
+      ],
+    );
+  }
+
   pw.Widget _totalLine(
     String label,
     String value,
@@ -286,7 +275,7 @@ class ReceiptPdfService {
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          _shapedText('$label:', style(bold: bold)),
+          pw.Text(label, style: style(bold: bold)),
           pw.Text(value, style: style(bold: bold)),
         ],
       ),
