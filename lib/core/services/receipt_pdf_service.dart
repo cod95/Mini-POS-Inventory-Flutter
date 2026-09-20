@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:arabic_reshaper/arabic_reshaper.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -49,7 +50,9 @@ class ReceiptPdfService {
   pw.Font? _arabicFont;
 
   Future<pw.Font> _loadArabicFont() async {
-    return _arabicFont ??= await PdfGoogleFonts.notoNaskhArabicRegular();
+    if (_arabicFont != null) return _arabicFont!;
+    final data = await rootBundle.load('assets/fonts/NotoNaskhArabic-Regular.ttf');
+    return _arabicFont = pw.Font.ttf(data);
   }
 
   /// `arabic_reshaper` joins Arabic letters into their correct connected
