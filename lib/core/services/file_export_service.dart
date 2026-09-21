@@ -117,7 +117,7 @@ class FileExportService {
 
     final doc = pw.Document(theme: theme);
     doc.addPage(
-      pw.MultiPage(
+      pw.Page(
         // Receipt-width roll paper, matching the invoice — not A4.
         pageFormat: PdfPageFormat.roll80.copyWith(
           marginLeft: 8,
@@ -129,7 +129,9 @@ class FileExportService {
         // embedded Arabic run correctly on its own; forcing the whole page
         // RTL here would double up with that and scramble the shaped text.
         textDirection: pw.TextDirection.ltr,
-        build: (context) => [
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
           pw.Center(
             child: pw.Text(shape(storeName), style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
           ),
@@ -178,7 +180,8 @@ class FileExportService {
               ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
 
