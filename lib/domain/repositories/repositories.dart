@@ -40,6 +40,26 @@ class SalesReportRow {
   final String status;
 }
 
+/// Sales/cost/profit for a period. Only completed (non-returned) invoices
+/// count; amounts are in USD (storage currency) and exclude TVA.
+class PeriodSummary {
+  const PeriodSummary({
+    required this.invoiceCount,
+    required this.totalSales,
+    required this.totalCost,
+    required this.returnCount,
+    required this.totalReturns,
+  });
+
+  final int invoiceCount;
+  final double totalSales;
+  final double totalCost;
+  final int returnCount;
+  final double totalReturns;
+
+  double get totalProfit => totalSales - totalCost;
+}
+
 class InventoryReportRow {
   const InventoryReportRow({
     required this.name,
@@ -123,6 +143,8 @@ abstract class ReportsRepository {
   Future<List<SalesReportRow>> salesReportRows({DateTime? from, DateTime? to});
 
   Future<List<InventoryReportRow>> inventoryReportRows();
+
+  Future<PeriodSummary> periodSummary({DateTime? from, DateTime? to});
 }
 
 abstract class PartyRepository {

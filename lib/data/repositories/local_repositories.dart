@@ -712,10 +712,28 @@ class LocalReportsRepository implements ReportsRepository {
   final AppDatabase _db;
   final ProductRepository _productRepository;
 
+  /// Only completed invoices are real sales. A returned invoice (the original
+  /// sale is flagged 'returned') and its RET- document are both excluded
+  /// from sales, cost, profit and invoice counts.
+  static bool _isCompletedSale(Sale sale) => sale.status == SaleStatus.completed.value;
+
+  /// Return documents created by returnItems() (RET-… invoice numbers).
+  static bool _isReturnDocument(Sale sale) =>
+      sale.status == SaleStatus.returned.value && sale.invoiceNo.startsWith('RET-');
+
+  /// Net sale value: after item + order discounts, without TVA.
+  static double _netSales(Sale sale) => sale.total - sale.taxTotal;
+
+  static double _itemsCost(Iterable<SaleItem> items) =>
+      items.fold(0.0, (sum, item) => sum + item.costSnapshot * item.qty);
+
   @override
   Future<DashboardMetrics> getDashboardMetrics({DateTime? since}) async {
     final allSales = await _db.select(_db.sales).get();
-    final sales = since == null ? allSales : allSales.where((s) => !s.createdAt.isBefore(since)).toList();
+    final sales = allSales
+        .where(_isCompletedSale)
+        .where((s) => since == null || !s.createdAt.isBefore(since))
+        .toList();
     final saleIds = sales.map((e) => e.id).toSet();
     final allItems = await _db.select(_db.saleItems).get();
     final items = allItems.where((item) => saleIds.contains(item.saleId)).toList();
@@ -725,8 +743,8 @@ class LocalReportsRepository implements ReportsRepository {
         date.year == now.year && date.month == now.month && date.day == now.day;
     bool isMonth(DateTime date) => date.year == now.year && date.month == now.month;
 
-    final todaySalesRows = sales.where((sale) => isToday(sale.createdAt));
-    final monthSalesRows = sales.where((sale) => isMonth(sale.createdAt));
+    final todaySalesRows = sales.where((sale) => isToday(sale.createdAt)).toList();
+    final monthSalesRows = sales.where((sale) => isMonth(sale.createdAt)).toList();
 
     final todayIds = todaySalesRows.map((e) => e.id).toSet();
     final monthIds = monthSalesRows.map((e) => e.id).toSet();
@@ -734,33 +752,13 @@ class LocalReportsRepository implements ReportsRepository {
     final todayItems = items.where((item) => todayIds.contains(item.saleId));
     final monthItems = items.where((item) => monthIds.contains(item.saleId));
 
-    final todayProfit = MoneyCalculator.round2(
-      todayItems.fold(
-        0.0,
-        (sum, item) =>
-            sum +
-            MoneyCalculator.profitForLine(
-              priceSnapshot: item.priceSnapshot,
-              costSnapshot: item.costSnapshot,
-              qty: item.qty,
-              discount: item.discount,
-            ),
-      ),
-    );
+    final todaySales = todaySalesRows.fold(0.0, (sum, e) => sum + _netSales(e));
+    final monthSales = monthSalesRows.fold(0.0, (sum, e) => sum + _netSales(e));
 
-    final monthProfit = MoneyCalculator.round2(
-      monthItems.fold(
-        0.0,
-        (sum, item) =>
-            sum +
-            MoneyCalculator.profitForLine(
-              priceSnapshot: item.priceSnapshot,
-              costSnapshot: item.costSnapshot,
-              qty: item.qty,
-              discount: item.discount,
-            ),
-      ),
-    );
+    // Profit = Sales - Cost, i.e. Σ qty × (sale price - cost price) minus
+    // discounts. Never the invoice totals themselves.
+    final todayProfit = MoneyCalculator.round2(todaySales - _itemsCost(todayItems));
+    final monthProfit = MoneyCalculator.round2(monthSales - _itemsCost(monthItems));
 
     final qtyMap = <String, int>{};
     for (final item in monthItems) {
@@ -772,13 +770,39 @@ class LocalReportsRepository implements ReportsRepository {
       ..sort((a, b) => b.qty.compareTo(a.qty));
 
     return DashboardMetrics(
-      todaySales: MoneyCalculator.round2(todaySalesRows.fold(0.0, (sum, e) => sum + e.total)),
+      todaySales: MoneyCalculator.round2(todaySales),
       todayInvoices: todayIds.length,
-      monthSales: MoneyCalculator.round2(monthSalesRows.fold(0.0, (sum, e) => sum + e.total)),
+      monthSales: MoneyCalculator.round2(monthSales),
       monthInvoices: monthIds.length,
       todayProfit: todayProfit,
       monthProfit: monthProfit,
       bestSellers: bestSellers.take(5).toList(),
+    );
+  }
+
+  @override
+  Future<PeriodSummary> periodSummary({DateTime? from, DateTime? to}) async {
+    final allSales = await _db.select(_db.sales).get();
+    final inRange = allSales.where((sale) {
+      final fromOk = from == null || !sale.createdAt.isBefore(from);
+      final toOk = to == null || !sale.createdAt.isAfter(to.add(const Duration(days: 1)));
+      return fromOk && toOk;
+    }).toList();
+
+    final completed = inRange.where(_isCompletedSale).toList();
+    final returns = inRange.where(_isReturnDocument).toList();
+
+    final completedIds = completed.map((e) => e.id).toSet();
+    final items = completedIds.isEmpty
+        ? const <SaleItem>[]
+        : await (_db.select(_db.saleItems)..where((tbl) => tbl.saleId.isIn(completedIds.toList()))).get();
+
+    return PeriodSummary(
+      invoiceCount: completed.length,
+      totalSales: MoneyCalculator.round2(completed.fold(0.0, (sum, e) => sum + _netSales(e))),
+      totalCost: MoneyCalculator.round2(_itemsCost(items)),
+      returnCount: returns.length,
+      totalReturns: MoneyCalculator.round2(returns.fold(0.0, (sum, e) => sum + e.total.abs())),
     );
   }
 
@@ -807,6 +831,7 @@ class LocalReportsRepository implements ReportsRepository {
   Future<List<SalesByProductMetric>> salesByProduct({DateTime? from, DateTime? to}) async {
     final sales = await _db.select(_db.sales).get();
     final saleIds = sales
+        .where(_isCompletedSale)
         .where((sale) {
           final fromOk = from == null || !sale.createdAt.isBefore(from);
           final toOk = to == null || !sale.createdAt.isAfter(to.add(const Duration(days: 1)));

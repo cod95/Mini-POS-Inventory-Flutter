@@ -179,6 +179,7 @@ class _ReportsView extends StatelessWidget {
                                         context.read<ReportsCubit>().printPeriodReport(
                                               storeName: settings.storeName,
                                               currency: settings.currency,
+                                              exchangeRate: settings.exchangeRate,
                                               languageCode: settings.language,
                                             );
                                       },
@@ -196,6 +197,7 @@ class _ReportsView extends StatelessWidget {
                                         context.read<ReportsCubit>().printPeriodReport(
                                               storeName: settings.storeName,
                                               currency: settings.currency,
+                                              exchangeRate: settings.exchangeRate,
                                               languageCode: settings.language,
                                               share: true,
                                             );
@@ -218,6 +220,7 @@ class _ReportsView extends StatelessWidget {
                                       context.read<ReportsCubit>().printPeriodReportViaBluetooth(
                                             storeName: settings.storeName,
                                             currency: settings.currency,
+                                              exchangeRate: settings.exchangeRate,
                                             printerMacAddress: settings.printerMacAddress,
                                             paperWidthMm: settings.printerPaperWidthMm,
                                             languageCode: settings.language,
@@ -398,14 +401,14 @@ class _BestSellersCard extends StatelessWidget {
             Text(context.l10n.tr('bestSellers'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             if (state.dashboard.bestSellers.isEmpty)
-              const EmptyState(message: 'No sales yet')
+              EmptyState(message: context.l10n.tr('noSalesYet'))
             else
               ...state.dashboard.bestSellers.map(
                 (seller) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                   title: Text(seller.productName),
-                  trailing: StatusChip(label: '${seller.qty} pcs', color: Colors.blue),
+                  trailing: StatusChip(label: '${seller.qty} ${context.l10n.tr('pcs')}', color: Colors.blue),
                 ),
               ),
           ],
@@ -443,7 +446,7 @@ class _SalesByProductCard extends StatelessWidget {
             Text(context.l10n.tr('salesByProduct'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             if (state.salesByProduct.isEmpty)
-              const EmptyState(message: 'No product sales in selected range')
+              EmptyState(message: context.l10n.tr('noProductSalesInRange'))
             else
               ...state.salesByProduct.take(8).map(
                 (row) => Padding(
@@ -455,7 +458,7 @@ class _SalesByProductCard extends StatelessWidget {
                         children: [
                           Expanded(child: Text(row.productName)),
                           Text(
-                            '${row.qty} pcs • ${AppFormatters.money(row.total, currency: currency, exchangeRate: exchangeRate)}',
+                            '${row.qty} ${context.l10n.tr('pcs')} • ${AppFormatters.money(row.total, currency: currency, exchangeRate: exchangeRate)}',
                           ),
                         ],
                       ),
@@ -488,7 +491,7 @@ class _LowStockCard extends StatelessWidget {
             Text(context.l10n.tr('lowStock'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             if (state.lowStockProducts.isEmpty)
-              const EmptyState(message: 'All products are healthy')
+              EmptyState(message: context.l10n.tr('allProductsHealthy'))
             else
               ...state.lowStockProducts.take(10).map(
                 (product) => ListTile(
@@ -540,7 +543,7 @@ class _InvoiceHistoryCard extends StatelessWidget {
             Text(context.l10n.tr('invoiceHistory'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             if (state.invoices.isEmpty)
-              const EmptyState(message: 'No invoices in selected range')
+              EmptyState(message: context.l10n.tr('noInvoicesInRange'))
             else
               ...state.invoices.take(25).map(
                 (invoice) => ListTile(
@@ -553,7 +556,10 @@ class _InvoiceHistoryCard extends StatelessWidget {
                     children: [
                       Text(AppFormatters.money(invoice.total, currency: currency, exchangeRate: exchangeRate)),
                       const SizedBox(width: AppSpacing.sm),
-                      StatusChip(label: invoice.status.value, color: _statusColor(invoice.status)),
+                      StatusChip(
+                        label: context.l10n.tr(invoice.status == SaleStatus.returned ? 'statusReturned' : 'statusCompleted'),
+                        color: _statusColor(invoice.status),
+                      ),
                     ],
                   ),
                   onTap: () => context.push('/reports/invoice/${invoice.id}'),

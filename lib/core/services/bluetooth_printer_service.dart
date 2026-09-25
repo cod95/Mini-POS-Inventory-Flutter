@@ -30,6 +30,8 @@ class BluetoothPrinterService {
       'period': 'Period',
       'invoicesSold': 'Invoices sold',
       'totalSales': 'Total sales',
+      'totalCost': 'Total cost',
+      'totalProfit': 'Total profit',
       'invoicesReturned': 'Invoices returned',
       'totalReturns': 'Total returns',
     },
@@ -44,9 +46,11 @@ class BluetoothPrinterService {
       'title': 'تقرير الفترة',
       'period': 'الفترة',
       'invoicesSold': 'عدد الفواتير المباعة',
-      'totalSales': 'إجمالي الفواتير المباعة',
+      'totalSales': 'إجمالي المبيعات',
+      'totalCost': 'إجمالي الكلفة',
+      'totalProfit': 'إجمالي الربح',
       'invoicesReturned': 'عدد الفواتير المرتجعة',
-      'totalReturns': 'إجمالي الفواتير المرتجعة',
+      'totalReturns': 'إجمالي المرتجعات',
     },
   };
 
@@ -173,6 +177,8 @@ class BluetoothPrinterService {
     required DateTime to,
     required int invoiceCount,
     required double totalSales,
+    required double totalCost,
+    required double totalProfit,
     required int returnCount,
     required double totalReturns,
     required List<InventoryReportRow> inventory,
@@ -186,6 +192,8 @@ class BluetoothPrinterService {
     final bytes = <int>[];
 
     String fmtDate(DateTime d) => d.toIso8601String().substring(0, 10);
+    final decimals = currency == 'LBP' ? 0 : 2;
+    String money(double v) => '${v.toStringAsFixed(decimals)} $currency';
 
     bytes.addAll(generator.text(
       storeName,
@@ -195,9 +203,11 @@ class BluetoothPrinterService {
     bytes.addAll(generator.text('${t['period']}: ${fmtDate(from)} - ${fmtDate(to)}', styles: const PosStyles(align: PosAlign.center)));
     bytes.addAll(generator.hr());
     bytes.addAll(_totalRow(generator, t['invoicesSold']!, '$invoiceCount'));
-    bytes.addAll(_totalRow(generator, t['totalSales']!, '${totalSales.toStringAsFixed(2)} $currency'));
+    bytes.addAll(_totalRow(generator, t['totalSales']!, money(totalSales)));
+    bytes.addAll(_totalRow(generator, t['totalCost']!, money(totalCost)));
+    bytes.addAll(_totalRow(generator, t['totalProfit']!, money(totalProfit), bold: true));
     bytes.addAll(_totalRow(generator, t['invoicesReturned']!, '$returnCount'));
-    bytes.addAll(_totalRow(generator, t['totalReturns']!, '${totalReturns.toStringAsFixed(2)} $currency'));
+    bytes.addAll(_totalRow(generator, t['totalReturns']!, money(totalReturns)));
     bytes.addAll(generator.hr());
     for (final row in inventory) {
       bytes.addAll(

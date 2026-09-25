@@ -164,6 +164,13 @@ class AppLocalizations {
       'todayProfit': 'Today profit',
       'monthProfit': 'Month profit',
       'invoicesWord': 'invoices',
+      'noSalesYet': 'No sales yet',
+      'pcs': 'pcs',
+      'noProductSalesInRange': 'No product sales in selected range',
+      'allProductsHealthy': 'All products are healthy',
+      'noInvoicesInRange': 'No invoices in selected range',
+      'statusCompleted': 'completed',
+      'statusReturned': 'returned',
     },
     'ar': {
       'appTitle': 'نقطة بيع ومخزون',
@@ -310,6 +317,13 @@ class AppLocalizations {
       'todayProfit': 'ربح اليوم',
       'monthProfit': 'ربح الشهر',
       'invoicesWord': 'فاتورة',
+      'noSalesYet': 'لا توجد مبيعات بعد',
+      'pcs': 'قطعة',
+      'noProductSalesInRange': 'لا توجد مبيعات أصناف في الفترة المحددة',
+      'allProductsHealthy': 'كل الأصناف مخزونها جيد',
+      'noInvoicesInRange': 'لا توجد فواتير في الفترة المحددة',
+      'statusCompleted': 'مكتملة',
+      'statusReturned': 'مرتجعة',
     },
   };
 

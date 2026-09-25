@@ -165,6 +165,7 @@ class ReportsCubit extends Cubit<ReportsState> {
   Future<void> printPeriodReport({
     required String storeName,
     required String currency,
+    double exchangeRate = 1,
     String languageCode = 'en',
     bool share = false,
   }) async {
@@ -172,20 +173,20 @@ class ReportsCubit extends Cubit<ReportsState> {
     try {
       final from = state.from ?? DateTime(2000);
       final to = state.to ?? DateTime.now();
-      final rows = await _reportsRepository.salesReportRows(from: from, to: to);
+      final summary = await _reportsRepository.periodSummary(from: from, to: to);
       final inventory = await _reportsRepository.inventoryReportRows();
-
-      final completed = rows.where((r) => r.status == 'completed');
-      final returned = rows.where((r) => r.status == 'returned');
+      double conv(double usd) => _toDisplay(usd, currency, exchangeRate);
 
       final file = await _exportService.generatePeriodReportPdf(
         storeName: storeName,
         from: from,
         to: to,
-        invoiceCount: completed.length,
-        totalSales: completed.fold<double>(0, (sum, r) => sum + r.total),
-        returnCount: returned.length,
-        totalReturns: returned.fold<double>(0, (sum, r) => sum + r.total.abs()),
+        invoiceCount: summary.invoiceCount,
+        totalSales: conv(summary.totalSales),
+        totalCost: conv(summary.totalCost),
+        totalProfit: conv(summary.totalProfit),
+        returnCount: summary.returnCount,
+        totalReturns: conv(summary.totalReturns),
         inventory: inventory,
         currency: currency,
         languageCode: languageCode,
@@ -206,6 +207,7 @@ class ReportsCubit extends Cubit<ReportsState> {
     required String currency,
     required String? printerMacAddress,
     required String paperWidthMm,
+    double exchangeRate = 1,
     String languageCode = 'en',
   }) async {
     if (printerMacAddress == null) {
@@ -216,11 +218,9 @@ class ReportsCubit extends Cubit<ReportsState> {
     try {
       final from = state.from ?? DateTime(2000);
       final to = state.to ?? DateTime.now();
-      final rows = await _reportsRepository.salesReportRows(from: from, to: to);
+      final summary = await _reportsRepository.periodSummary(from: from, to: to);
       final inventory = await _reportsRepository.inventoryReportRows();
-
-      final completed = rows.where((r) => r.status == 'completed');
-      final returned = rows.where((r) => r.status == 'returned');
+      double conv(double usd) => _toDisplay(usd, currency, exchangeRate);
 
       final connected = await _bluetoothPrinterService.connect(printerMacAddress);
       if (!connected) {
@@ -231,10 +231,12 @@ class ReportsCubit extends Cubit<ReportsState> {
         storeName: storeName,
         from: from,
         to: to,
-        invoiceCount: completed.length,
-        totalSales: completed.fold<double>(0, (sum, r) => sum + r.total),
-        returnCount: returned.length,
-        totalReturns: returned.fold<double>(0, (sum, r) => sum + r.total.abs()),
+        invoiceCount: summary.invoiceCount,
+        totalSales: conv(summary.totalSales),
+        totalCost: conv(summary.totalCost),
+        totalProfit: conv(summary.totalProfit),
+        returnCount: summary.returnCount,
+        totalReturns: conv(summary.totalReturns),
         inventory: inventory,
         currency: currency,
         paperWidthMm: paperWidthMm,
@@ -245,4 +247,8 @@ class ReportsCubit extends Cubit<ReportsState> {
       emit(state.copyWith(loading: false, error: e.toString()));
     }
   }
+
+  /// Stored amounts are USD; the report shows them in the selected currency.
+  static double _toDisplay(double usd, String currency, double exchangeRate) =>
+      currency == 'LBP' ? usd * exchangeRate : usd;
 }
