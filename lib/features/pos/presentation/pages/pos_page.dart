@@ -32,6 +32,7 @@ class PosPage extends StatelessWidget {
         scannerService: deps.barcodeScannerService,
         receiptPdfService: deps.receiptPdfService,
         bluetoothPrinterService: deps.bluetoothPrinterService,
+        currentUserName: () => deps.appCubit.state.session?.userName,
       )..load(),
       child: const _PosView(),
     );

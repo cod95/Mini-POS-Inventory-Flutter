@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/models/app_models.dart';
+import '../../../../domain/entities/app_entities.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/state/app_cubit.dart';
 import '../../../../core/widgets/buttons.dart';
 import '../../../../core/widgets/fields.dart';
 
-/// دخول لمستخدم واحد فقط: كلمة سر واحدة بتفتح كل التطبيق بصلاحية كاملة
-/// (ما في تفريق أدمن/كاشير بعد اليوم). كلمة السر تتغيّر من:
-/// الإعدادات -> Credentials -> "Admin password".
+/// Login: pick a user, then enter his password (admin) or PIN (cashier).
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -20,6 +21,40 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
+  List<AppUser> _users = const [];
+  int? _selectedUserId;
+  bool _loadedUsers = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedUsers) {
+      _loadedUsers = true;
+      _loadUsers();
+    }
+  }
+
+  Future<void> _loadUsers() async {
+    final users = await AppScope.of(context).authRepository.getUsers(activeOnly: true);
+    if (!mounted) return;
+    setState(() {
+      _users = users;
+      _selectedUserId ??= users.isEmpty ? null : users.first.id;
+    });
+  }
+
+  AppUser? get _selectedUser {
+    for (final user in _users) {
+      if (user.id == _selectedUserId) return user;
+    }
+    return null;
+  }
+
+  void _submit() {
+    final id = _selectedUserId;
+    if (id == null) return;
+    context.read<AppCubit>().login(id, _passwordController.text);
+  }
 
   @override
   void dispose() {
@@ -60,17 +95,38 @@ class _LoginPageState extends State<LoginPage> {
                           const SizedBox(height: AppSpacing.sm),
                           Text(l10n.tr('login'), style: Theme.of(context).textTheme.titleMedium),
                           const SizedBox(height: AppSpacing.xl),
+                          DropdownButtonFormField<int>(
+                            value: _selectedUserId,
+                            decoration: InputDecoration(
+                              labelText: l10n.isArabic ? 'المستخدم' : 'User',
+                            ),
+                            items: _users
+                                .map(
+                                  (u) => DropdownMenuItem(
+                                    value: u.id,
+                                    child: Text(
+                                      '${u.name}  (${u.role == UserRole.admin ? (l10n.isArabic ? 'أدمن' : 'Admin') : (l10n.isArabic ? 'كاشير' : 'Cashier')})',
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) => setState(() {
+                              _selectedUserId = value;
+                              _passwordController.clear();
+                            }),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
                           AppTextField(
                             controller: _passwordController,
-                            label: l10n.tr('adminPassword'),
+                            label: _selectedUser?.role == UserRole.cashier
+                                ? (l10n.isArabic ? 'الرمز (PIN)' : 'PIN')
+                                : (l10n.isArabic ? 'كلمة السر' : 'Password'),
                             obscureText: true,
                           ),
                           const SizedBox(height: AppSpacing.lg),
                           PrimaryButton(
                             label: l10n.tr('login'),
-                            onPressed: state.loading
-                                ? null
-                                : () => context.read<AppCubit>().loginAdmin(_passwordController.text.trim()),
+                            onPressed: state.loading || _selectedUserId == null ? null : _submit,
                           ),
                           if (state.error != null) ...[
                             const SizedBox(height: AppSpacing.md),

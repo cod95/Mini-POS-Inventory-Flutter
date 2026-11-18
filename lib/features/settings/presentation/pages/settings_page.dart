@@ -220,26 +220,16 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               const SizedBox(height: AppSpacing.md),
               Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(context.l10n.tr('credentials'), style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: AppSpacing.md),
-                      AppTextField(
-                        controller: _cashierPinController,
-                        label: l10n.tr('pin'),
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      AppTextField(
-                        controller: _adminPasswordController,
-                        label: l10n.tr('adminPassword'),
-                        obscureText: true,
-                      ),
-                    ],
+                child: ListTile(
+                  leading: const Icon(Icons.people_outline),
+                  title: Text(l10n.isArabic ? 'المستخدمين' : 'Users'),
+                  subtitle: Text(
+                    l10n.isArabic
+                        ? 'أدمن وكاشير: إضافة وتعديل وكلمات السر'
+                        : 'Admin and cashier accounts, passwords and PINs',
                   ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/settings/users'),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),

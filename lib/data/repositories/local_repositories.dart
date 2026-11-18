@@ -14,35 +14,106 @@ class LocalAuthRepository implements AuthRepository {
 
   final AppDatabase _db;
 
+  AppUser _toUser(UserAccount row) => AppUser(
+        id: row.id,
+        uuid: row.uuid,
+        name: row.name,
+        role: UserRoleX.fromValue(row.role),
+        secret: row.secret,
+        active: row.active,
+      );
+
   @override
-  Future<UserRole?> loginAsAdmin(String password) async {
-    final settings = await _settings();
-    if (settings.adminPassword == password) {
-      return UserRole.admin;
-    }
-    return null;
+  Future<List<AppUser>> getUsers({bool activeOnly = false}) async {
+    final rows = await (_db.select(_db.userAccounts)
+          ..orderBy([(t) => OrderingTerm.asc(t.role), (t) => OrderingTerm.asc(t.name)]))
+        .get();
+    return rows.where((r) => !activeOnly || r.active).map(_toUser).toList();
   }
 
   @override
-  Future<UserRole?> loginWithPin(String pin) async {
-    final settings = await _settings();
-    if (settings.cashierPin == pin) {
-      return UserRole.cashier;
+  Future<AppUser?> login(int userId, String secret) async {
+    final row = await (_db.select(_db.userAccounts)..where((t) => t.id.equals(userId)))
+        .getSingleOrNull();
+    if (row == null || !row.active || row.secret != secret) {
+      return null;
     }
-    return null;
+    return _toUser(row);
+  }
+
+  Future<int> _activeAdminCount({int? except}) async {
+    final rows = await (_db.select(_db.userAccounts)
+          ..where((t) => t.role.equals(UserRole.admin.value) & t.active.equals(true)))
+        .get();
+    return rows.where((r) => r.id != except).length;
+  }
+
+  @override
+  Future<int> saveUser({
+    int? id,
+    required String name,
+    required UserRole role,
+    required String secret,
+    bool active = true,
+  }) async {
+    final cleanName = name.trim();
+    final cleanSecret = secret.trim();
+    if (cleanName.isEmpty) throw AppException('Name is required');
+    if (cleanSecret.isEmpty) throw AppException('Password / PIN is required');
+
+    final sameName = await (_db.select(_db.userAccounts)
+          ..where((t) => t.name.lower().equals(cleanName.toLowerCase())))
+        .get();
+    if (sameName.any((u) => u.id != id)) {
+      throw AppException('This name is already used');
+    }
+
+    if (id == null) {
+      return _db.into(_db.userAccounts).insert(
+            UserAccountsCompanion.insert(
+              uuid: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 31)}',
+              name: cleanName,
+              role: role.value,
+              secret: cleanSecret,
+              active: Value(active),
+            ),
+          );
+    }
+
+    final existing = await (_db.select(_db.userAccounts)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (existing == null) throw AppException('User not found');
+
+    final staysActiveAdmin = role == UserRole.admin && active;
+    if (!staysActiveAdmin && await _activeAdminCount(except: id) == 0) {
+      throw AppException('There must be at least one active admin');
+    }
+
+    await (_db.update(_db.userAccounts)..where((t) => t.id.equals(id))).write(
+      UserAccountsCompanion(
+        name: Value(cleanName),
+        role: Value(role.value),
+        secret: Value(cleanSecret),
+        active: Value(active),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+    return id;
+  }
+
+  @override
+  Future<void> deleteUser(int id) async {
+    final existing = await (_db.select(_db.userAccounts)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (existing == null) return;
+    if (existing.role == UserRole.admin.value && await _activeAdminCount(except: id) == 0) {
+      throw AppException('There must be at least one active admin');
+    }
+    await (_db.delete(_db.userAccounts)..where((t) => t.id.equals(id))).go();
   }
 
   @override
   Future<void> logout() async {}
-
-  Future<AppSetting> _settings() async {
-    final row = await (_db.select(_db.appSettings)..where((tbl) => tbl.id.equals(1)))
-        .getSingleOrNull();
-    if (row != null) {
-      return row;
-    }
-    throw AppException('Settings not found');
-  }
 }
 
 class LocalSettingsRepository implements SettingsRepository {
@@ -417,6 +488,7 @@ class LocalSalesRepository implements SalesRepository {
                     ? null
                     : input.customerName!.trim(),
               ),
+              cashierName: Value(input.cashierName),
               subtotal: subtotal,
               discountTotal: discountTotal,
               taxTotal: tax,
@@ -832,6 +904,7 @@ class LocalSalesRepository implements SalesRepository {
       secondaryCurrencyCode: sale.secondaryCurrencyCode,
       exchangeRateAtSale: sale.exchangeRateAtSale,
       originalSaleId: sale.originalSaleId,
+      cashierName: sale.cashierName,
     );
   }
 

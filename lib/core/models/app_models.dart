@@ -550,6 +550,7 @@ class SaleCheckoutInput extends Equatable {
     required this.paymentMethod,
     this.customerId,
     this.customerName,
+    this.cashierName,
   });
 
   final List<CartItem> items;
@@ -560,9 +561,11 @@ class SaleCheckoutInput extends Equatable {
   final PaymentMethod paymentMethod;
   final int? customerId;
   final String? customerName;
+  final String? cashierName;
 
   @override
   List<Object?> get props => [
+        cashierName,
         items,
         orderDiscount,
         taxEnabled,

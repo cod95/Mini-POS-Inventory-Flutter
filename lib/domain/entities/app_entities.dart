@@ -114,8 +114,10 @@ class SaleView extends Equatable {
     required this.secondaryCurrencyCode,
     required this.exchangeRateAtSale,
     this.originalSaleId,
+    this.cashierName,
   });
 
+  final String? cashierName;
   final int id;
   final String invoiceNo;
   final DateTime createdAt;
@@ -177,11 +179,40 @@ class SaleDetailView extends Equatable {
 }
 
 class AuthSession extends Equatable {
-  const AuthSession({required this.role, required this.loginTime});
+  const AuthSession({
+    required this.role,
+    required this.loginTime,
+    this.userId,
+    this.userName,
+  });
 
   final UserRole role;
   final DateTime loginTime;
+  final int? userId;
+  final String? userName;
 
   @override
-  List<Object?> get props => [role, loginTime];
+  List<Object?> get props => [role, loginTime, userId, userName];
+}
+
+/// A login account (admin or cashier).
+class AppUser extends Equatable {
+  const AppUser({
+    required this.id,
+    required this.uuid,
+    required this.name,
+    required this.role,
+    required this.secret,
+    required this.active,
+  });
+
+  final int id;
+  final String uuid;
+  final String name;
+  final UserRole role;
+  final String secret;
+  final bool active;
+
+  @override
+  List<Object?> get props => [id, uuid, name, role, secret, active];
 }

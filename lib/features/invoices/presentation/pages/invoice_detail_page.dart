@@ -122,6 +122,8 @@ class _InvoiceDetailView extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: AppSpacing.xs),
               Text('${l10n.tr('customerName')}: $customerLabel'),
+              if ((sale.cashierName ?? '').isNotEmpty)
+                Text('${ar ? 'الكاشير' : 'Cashier'}: ${sale.cashierName}'),
               const SizedBox(height: AppSpacing.md),
               Card(
                 child: Padding(

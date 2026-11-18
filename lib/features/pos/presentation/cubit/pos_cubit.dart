@@ -170,7 +170,9 @@ class PosCubit extends Cubit<PosState> {
     required BarcodeScannerService scannerService,
     required ReceiptPdfService receiptPdfService,
     required BluetoothPrinterService bluetoothPrinterService,
-  })  : _productRepository = productRepository,
+    String? Function()? currentUserName,
+  })  : _currentUserName = currentUserName,
+        _productRepository = productRepository,
         _salesRepository = salesRepository,
         _settingsRepository = settingsRepository,
         _partyRepository = partyRepository,
@@ -179,6 +181,7 @@ class PosCubit extends Cubit<PosState> {
         _bluetoothPrinterService = bluetoothPrinterService,
         super(const PosState());
 
+  final String? Function()? _currentUserName;
   final ProductRepository _productRepository;
   final SalesRepository _salesRepository;
   final SettingsRepository _settingsRepository;
@@ -339,6 +342,7 @@ class PosCubit extends Cubit<PosState> {
           paymentMethod: state.paymentMethod,
           customerId: state.selectedCustomerId,
           customerName: state.customerName,
+          cashierName: _currentUserName?.call(),
         ),
       );
 

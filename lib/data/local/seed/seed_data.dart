@@ -12,6 +12,36 @@ class SeedData {
 
   Future<void> ensureSeeded() async {
     await _ensureSettings();
+    await _ensureUsers();
+  }
+
+  /// First run (or first run after upgrading to multi-user): creates the
+  /// default Admin and Cashier accounts from the legacy password/PIN stored
+  /// in settings. The fixed uuids let two devices recognise the same default
+  /// accounts when they sync.
+  Future<void> _ensureUsers() async {
+    final existing = await db.select(db.userAccounts).get();
+    if (existing.isNotEmpty) return;
+    final settings =
+        await (db.select(db.appSettings)..where((t) => t.id.equals(1))).getSingleOrNull();
+    await db.into(db.userAccounts).insert(
+          UserAccountsCompanion.insert(
+            uuid: 'default-admin',
+            name: 'Admin',
+            role: 'admin',
+            secret: settings?.adminPassword ?? 'admin123',
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+    await db.into(db.userAccounts).insert(
+          UserAccountsCompanion.insert(
+            uuid: 'default-cashier',
+            name: 'Cashier',
+            role: 'cashier',
+            secret: settings?.cashierPin ?? '1234',
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
   }
 
   /// Inserts the default settings row ONLY the very first time the app runs

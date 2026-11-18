@@ -147,6 +147,9 @@ class Sales extends Table {
   /// For return documents (RET-…): the id of the original sale being
   /// returned. Null for ordinary sales.
   IntColumn get originalSaleId => integer().nullable()();
+
+  /// Name of the user (cashier/admin) who made the sale.
+  TextColumn get cashierName => text().nullable()();
 }
 
 class SaleItems extends Table {
@@ -175,6 +178,26 @@ class SaleItems extends Table {
   /// For rows of a return document: the sale item being returned. Used to
   /// know how much of each original line was already returned.
   IntColumn get originalItemId => integer().nullable()();
+}
+
+/// Login accounts. `role` is 'admin' or 'cashier'; `secret` is the password
+/// (admin) or PIN (cashier).
+class UserAccounts extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get uuid => text().unique()();
+
+  TextColumn get name => text()();
+
+  TextColumn get role => text()();
+
+  TextColumn get secret => text()();
+
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 }
 
 class AppSettings extends Table {
@@ -239,13 +262,14 @@ class AppSettings extends Table {
     Sales,
     SaleItems,
     AppSettings,
+    UserAccounts,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -279,6 +303,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 8) {
             await m.addColumn(sales, sales.originalSaleId);
             await m.addColumn(saleItems, saleItems.originalItemId);
+          }
+          if (from < 9) {
+            await m.createTable(userAccounts);
+            await m.addColumn(sales, sales.cashierName);
           }
         },
       );

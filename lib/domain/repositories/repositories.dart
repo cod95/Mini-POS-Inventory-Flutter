@@ -81,9 +81,23 @@ class InventoryReportRow {
 }
 
 abstract class AuthRepository {
-  Future<UserRole?> loginWithPin(String pin);
+  Future<List<AppUser>> getUsers({bool activeOnly = false});
 
-  Future<UserRole?> loginAsAdmin(String password);
+  /// Returns the user when [secret] matches, otherwise null.
+  Future<AppUser?> login(int userId, String secret);
+
+  /// Creates (id == null) or updates a user. Throws AppException when the
+  /// change would leave the shop without an active admin or the name is
+  /// already used.
+  Future<int> saveUser({
+    int? id,
+    required String name,
+    required UserRole role,
+    required String secret,
+    bool active = true,
+  });
+
+  Future<void> deleteUser(int id);
 
   Future<void> logout();
 }

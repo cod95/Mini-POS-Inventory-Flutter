@@ -63,33 +63,23 @@ class AppCubit extends Cubit<AppState> {
     }
   }
 
-  Future<bool> loginCashier(String pin) async {
+  /// Logs in a user chosen by id with his password (admin) or PIN (cashier).
+  Future<bool> login(int userId, String secret) async {
     emit(state.copyWith(loading: true, clearError: true));
-    final role = await _authRepository.loginWithPin(pin);
-    if (role == null) {
+    final user = await _authRepository.login(userId, secret.trim());
+    if (user == null) {
       emit(state.copyWith(loading: false, error: 'Invalid credentials'));
       return false;
     }
     emit(
       state.copyWith(
         loading: false,
-        session: AuthSession(role: role, loginTime: DateTime.now()),
-      ),
-    );
-    return true;
-  }
-
-  Future<bool> loginAdmin(String password) async {
-    emit(state.copyWith(loading: true, clearError: true));
-    final role = await _authRepository.loginAsAdmin(password);
-    if (role == null) {
-      emit(state.copyWith(loading: false, error: 'Invalid credentials'));
-      return false;
-    }
-    emit(
-      state.copyWith(
-        loading: false,
-        session: AuthSession(role: role, loginTime: DateTime.now()),
+        session: AuthSession(
+          role: user.role,
+          loginTime: DateTime.now(),
+          userId: user.id,
+          userName: user.name,
+        ),
       ),
     );
     return true;

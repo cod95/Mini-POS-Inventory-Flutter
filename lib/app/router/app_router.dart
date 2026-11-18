@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/models/app_models.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/data_tools/presentation/pages/data_tools_page.dart';
 import '../../features/invoices/presentation/pages/invoice_detail_page.dart';
@@ -11,6 +12,8 @@ import '../../features/pos/presentation/pages/pos_page.dart';
 import '../../features/products/presentation/pages/products_page.dart';
 import '../../features/reports/presentation/pages/reports_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/users/presentation/pages/account_page.dart';
+import '../../features/users/presentation/pages/users_page.dart';
 import '../../features/shell/presentation/pages/app_shell_page.dart';
 import '../app_dependencies.dart';
 
@@ -29,6 +32,16 @@ class AppRouter {
             }
             if (isAuthenticated && isLoginRoute) {
               return '/pos';
+            }
+
+            // A cashier may only use the POS, the invoices and his account.
+            final session = dependencies.appCubit.state.session;
+            if (session != null && session.role != UserRole.admin) {
+              final path = state.uri.path;
+              const adminOnly = ['/products', '/reports', '/settings/'];
+              if (adminOnly.any(path.startsWith)) {
+                return '/pos';
+              }
             }
             return null;
           },
@@ -78,8 +91,15 @@ class AppRouter {
                 ),
                 GoRoute(
                   path: '/settings',
-                  builder: (context, state) => const SettingsPage(),
+                  builder: (context, state) =>
+                      dependencies.appCubit.state.session?.role == UserRole.admin
+                          ? const SettingsPage()
+                          : const AccountPage(),
                   routes: [
+                    GoRoute(
+                      path: 'users',
+                      builder: (context, state) => const UsersPage(),
+                    ),
                     GoRoute(
                       path: 'data',
                       builder: (context, state) => const DataToolsPage(),
