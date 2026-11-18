@@ -50,6 +50,17 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
+  String _errorText(String error, bool ar, String invalid) {
+    if (error.startsWith('locked:')) {
+      final seconds = int.tryParse(error.substring(7)) ?? 60;
+      final minutes = (seconds / 60).ceil();
+      return ar
+          ? 'الحساب مقفول مؤقتاً بسبب محاولات غلط. جرّب بعد $minutes دقيقة.'
+          : 'Account temporarily locked after wrong attempts. Try again in $minutes min.';
+    }
+    return invalid;
+  }
+
   void _submit() {
     final id = _selectedUserId;
     if (id == null) return;
@@ -131,7 +142,7 @@ class _LoginPageState extends State<LoginPage> {
                           if (state.error != null) ...[
                             const SizedBox(height: AppSpacing.md),
                             Text(
-                              l10n.tr('invalidCredentials'),
+                              _errorText(state.error!, l10n.isArabic, l10n.tr('invalidCredentials')),
                               style: TextStyle(color: Theme.of(context).colorScheme.error),
                             ),
                           ],

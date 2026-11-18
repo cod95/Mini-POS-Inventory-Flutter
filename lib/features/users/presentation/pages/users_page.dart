@@ -49,7 +49,7 @@ class _UsersPageState extends State<UsersPage> {
   Future<void> _edit([AppUser? user]) async {
     final ar = _ar;
     final nameController = TextEditingController(text: user?.name ?? '');
-    final secretController = TextEditingController(text: user?.secret ?? '');
+    final secretController = TextEditingController();
     var role = user?.role ?? UserRole.cashier;
     var active = user?.active ?? true;
     String? dialogError;
@@ -70,10 +70,14 @@ class _UsersPageState extends State<UsersPage> {
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: secretController,
+                  obscureText: true,
                   decoration: InputDecoration(
                     labelText: role == UserRole.admin
                         ? (ar ? 'كلمة السر' : 'Password')
                         : (ar ? 'الرمز (PIN)' : 'PIN'),
+                    helperText: user == null
+                        ? null
+                        : (ar ? 'اتركها فاضية إذا ما بدك تغيّرها' : 'Leave empty to keep the current one'),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),

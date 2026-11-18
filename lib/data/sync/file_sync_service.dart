@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/security/sync_crypto.dart';
 import '../local/db/app_database.dart';
 
 class SyncImportResult {
@@ -37,13 +40,53 @@ class FileSyncService {
   final AppDatabase _db;
 
   static const String _format = 'quickstock-sync';
-  static const int _version = 1;
+  static const int _version = 2;
+
+  // ------------------------------------------------------------- shop code
+
+  Future<String?> getSyncCode() async {
+    final row = await _settings();
+    final code = row.syncCode;
+    return (code == null || code.isEmpty) ? null : SyncCrypto.pretty(code);
+  }
+
+  /// Creates a new random shop code (main phone) and stores it.
+  Future<String> createSyncCode() async {
+    final code = SyncCrypto.generateCode();
+    await _storeSyncCode(code);
+    return code;
+  }
+
+  /// Stores the code typed in from the main phone. Throws FormatException
+  /// when it does not look like a shop code.
+  Future<void> setSyncCode(String code) async {
+    if (!SyncCrypto.isValidCode(code)) throw const FormatException('BAD_CODE');
+    await _storeSyncCode(SyncCrypto.pretty(code));
+  }
+
+  Future<void> _storeSyncCode(String code) async {
+    await _settings();
+    await (_db.update(_db.appSettings)..where((t) => t.id.equals(1))).write(
+      AppSettingsCompanion(syncCode: Value(code)),
+    );
+  }
+
+  Future<Uint8List> _key() async {
+    final code = await getSyncCode();
+    if (code == null) throw const FormatException('NO_SYNC_CODE');
+    return SyncCrypto.deriveKey(code);
+  }
 
   // ----------------------------------------------------------------- export
 
   Future<File> exportToFile({required bool includeAdminData}) async {
+    final key = await _key();
     final data = await _buildPackage(includeAdminData: includeAdminData);
-    final bytes = gzip.encode(utf8.encode(jsonEncode(data)));
+    final json = Uint8List.fromList(utf8.encode(jsonEncode(data)));
+    final encrypted = await Isolate.run(
+      () => SyncCrypto.encryptSync(Uint8List.fromList(gzip.encode(json)), key),
+    );
+    final bytes = <int>[...SyncCrypto.magic, ...encrypted];
 
     final dir = await getTemporaryDirectory();
     final code = (data['deviceCode'] as String).isEmpty ? 'main' : data['deviceCode'];
@@ -193,16 +236,20 @@ class FileSyncService {
   // ----------------------------------------------------------------- import
 
   Future<SyncImportResult> importFromFile(File file) async {
+    final raw = await file.readAsBytes();
+    if (!SyncCrypto.hasMagic(raw)) {
+      throw const FormatException('NOT_A_SYNC_FILE');
+    }
+    final key = await _key();
     final Map<String, dynamic> data;
     try {
-      final raw = await file.readAsBytes();
-      List<int> bytes;
-      try {
-        bytes = gzip.decode(raw);
-      } catch (_) {
-        bytes = raw; // plain json
-      }
-      data = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      final body = Uint8List.sublistView(raw, SyncCrypto.magic.length);
+      final plain = await Isolate.run(
+        () => Uint8List.fromList(gzip.decode(SyncCrypto.decryptSync(body, key))),
+      );
+      data = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
+    } on SyncDecryptException {
+      throw const FormatException('WRONG_CODE');
     } catch (_) {
       throw const FormatException('NOT_A_SYNC_FILE');
     }
@@ -211,6 +258,8 @@ class FileSyncService {
     }
     return _import(data);
   }
+
+  static bool _isDefaultSecret(String secret) => secret == 'admin123' || secret == '1234';
 
   static DateTime _parse(Object? v) => DateTime.tryParse('$v')?.toLocal() ?? DateTime.now();
 
@@ -253,6 +302,7 @@ class FileSyncService {
                     name: '${u['name']}',
                     role: '${u['role']}',
                     secret: '${u['secret']}',
+                    mustChangeSecret: Value(_isDefaultSecret('${u['secret']}')),
                     active: Value(u['active'] == true),
                     updatedAt: Value(incomingAt),
                   ),
@@ -264,6 +314,7 @@ class FileSyncService {
                 name: Value('${u['name']}'),
                 role: Value('${u['role']}'),
                 secret: Value('${u['secret']}'),
+                mustChangeSecret: Value(_isDefaultSecret('${u['secret']}')),
                 active: Value(u['active'] == true),
                 updatedAt: Value(incomingAt),
               ),

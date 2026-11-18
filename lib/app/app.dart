@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import '../core/l10n/app_localizations.dart';
 import '../core/state/app_cubit.dart';
 import 'app_dependencies.dart';
+import 'idle_guard.dart';
 import 'app_scope.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
@@ -49,6 +50,10 @@ class _MiniPosRootState extends State<MiniPosRoot> {
                 GlobalCupertinoLocalizations.delegate,
               ],
               routerConfig: _appRouter.router,
+              builder: (context, child) => IdleGuard(
+                cubit: widget.dependencies.appCubit,
+                child: child ?? const SizedBox.shrink(),
+              ),
             );
           },
         ),

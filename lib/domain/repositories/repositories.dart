@@ -83,8 +83,18 @@ class InventoryReportRow {
 abstract class AuthRepository {
   Future<List<AppUser>> getUsers({bool activeOnly = false});
 
-  /// Returns the user when [secret] matches, otherwise null.
+  /// Returns the user when [secret] matches, otherwise null. Throws
+  /// [LoginLockedException] while the account is temporarily locked after
+  /// too many wrong attempts.
   Future<AppUser?> login(int userId, String secret);
+
+  /// Sets a new password / PIN for [userId]. When [currentSecret] is given it
+  /// must match the old one. Throws AppException when it is too weak.
+  Future<void> changeSecret({
+    required int userId,
+    required String newSecret,
+    String? currentSecret,
+  });
 
   /// Creates (id == null) or updates a user. Throws AppException when the
   /// change would leave the shop without an active admin or the name is
@@ -93,7 +103,7 @@ abstract class AuthRepository {
     int? id,
     required String name,
     required UserRole role,
-    required String secret,
+    String? secret,
     bool active = true,
   });
 

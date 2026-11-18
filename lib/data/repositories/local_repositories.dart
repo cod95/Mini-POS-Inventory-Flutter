@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/errors/app_exception.dart';
 import '../../core/models/app_models.dart';
+import '../../core/security/secret_hasher.dart';
 import '../../core/utils/money_calculator.dart';
 import '../../data/local/db/app_database.dart';
 import '../../domain/entities/app_entities.dart';
@@ -19,8 +20,9 @@ class LocalAuthRepository implements AuthRepository {
         uuid: row.uuid,
         name: row.name,
         role: UserRoleX.fromValue(row.role),
-        secret: row.secret,
         active: row.active,
+        mustChangeSecret: row.mustChangeSecret,
+        lockedUntil: row.lockedUntil,
       );
 
   @override
@@ -35,10 +37,68 @@ class LocalAuthRepository implements AuthRepository {
   Future<AppUser?> login(int userId, String secret) async {
     final row = await (_db.select(_db.userAccounts)..where((t) => t.id.equals(userId)))
         .getSingleOrNull();
-    if (row == null || !row.active || row.secret != secret) {
+    if (row == null || !row.active) return null;
+
+    final now = DateTime.now();
+    final lockedUntil = row.lockedUntil;
+    if (lockedUntil != null && lockedUntil.isAfter(now)) {
+      throw LoginLockedException(lockedUntil.difference(now).inSeconds + 1);
+    }
+
+    final ok = await SecretHasher.verify(secret, row.secret);
+    if (!ok) {
+      final attempts = row.failedAttempts + 1;
+      DateTime? lock;
+      if (attempts >= 5) {
+        final minutes = min(30, 1 << min(5, attempts - 5));
+        lock = now.add(Duration(minutes: minutes));
+      }
+      await (_db.update(_db.userAccounts)..where((t) => t.id.equals(row.id))).write(
+        UserAccountsCompanion(
+          failedAttempts: Value(attempts),
+          lockedUntil: Value(lock),
+        ),
+      );
+      if (lock != null) throw LoginLockedException(lock.difference(now).inSeconds + 1);
       return null;
     }
+
+    // Old plain-text secrets are replaced by a salted hash on first success.
+    final upgraded = SecretHasher.isHashed(row.secret) ? null : await SecretHasher.hash(secret);
+    await (_db.update(_db.userAccounts)..where((t) => t.id.equals(row.id))).write(
+      UserAccountsCompanion(
+        failedAttempts: const Value(0),
+        lockedUntil: const Value(null),
+        secret: upgraded == null ? const Value.absent() : Value(upgraded),
+      ),
+    );
     return _toUser(row);
+  }
+
+  @override
+  Future<void> changeSecret({
+    required int userId,
+    required String newSecret,
+    String? currentSecret,
+  }) async {
+    final row = await (_db.select(_db.userAccounts)..where((t) => t.id.equals(userId)))
+        .getSingleOrNull();
+    if (row == null) throw AppException('User not found');
+    if (currentSecret != null && !await SecretHasher.verify(currentSecret.trim(), row.secret)) {
+      throw AppException('الكلمة الحالية غلط / Current password is wrong');
+    }
+    final clean = newSecret.trim();
+    final problem = SecretPolicy.check(clean, isAdmin: row.role == UserRole.admin.value);
+    if (problem != null) throw AppException(problem);
+    await (_db.update(_db.userAccounts)..where((t) => t.id.equals(userId))).write(
+      UserAccountsCompanion(
+        secret: Value(await SecretHasher.hash(clean)),
+        mustChangeSecret: const Value(false),
+        failedAttempts: const Value(0),
+        lockedUntil: const Value(null),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   Future<int> _activeAdminCount({int? except}) async {
@@ -53,13 +113,17 @@ class LocalAuthRepository implements AuthRepository {
     int? id,
     required String name,
     required UserRole role,
-    required String secret,
+    String? secret,
     bool active = true,
   }) async {
     final cleanName = name.trim();
-    final cleanSecret = secret.trim();
+    final cleanSecret = (secret ?? '').trim();
     if (cleanName.isEmpty) throw AppException('Name is required');
-    if (cleanSecret.isEmpty) throw AppException('Password / PIN is required');
+    if (id == null && cleanSecret.isEmpty) throw AppException('Password / PIN is required');
+    if (cleanSecret.isNotEmpty) {
+      final problem = SecretPolicy.check(cleanSecret, isAdmin: role == UserRole.admin);
+      if (problem != null) throw AppException(problem);
+    }
 
     final sameName = await (_db.select(_db.userAccounts)
           ..where((t) => t.name.lower().equals(cleanName.toLowerCase())))
@@ -71,10 +135,10 @@ class LocalAuthRepository implements AuthRepository {
     if (id == null) {
       return _db.into(_db.userAccounts).insert(
             UserAccountsCompanion.insert(
-              uuid: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 31)}',
+              uuid: newUuid(),
               name: cleanName,
               role: role.value,
-              secret: cleanSecret,
+              secret: await SecretHasher.hash(cleanSecret),
               active: Value(active),
             ),
           );
@@ -93,8 +157,12 @@ class LocalAuthRepository implements AuthRepository {
       UserAccountsCompanion(
         name: Value(cleanName),
         role: Value(role.value),
-        secret: Value(cleanSecret),
+        secret: cleanSecret.isEmpty ? const Value.absent() : Value(await SecretHasher.hash(cleanSecret)),
+        mustChangeSecret: cleanSecret.isEmpty ? const Value.absent() : const Value(false),
         active: Value(active),
+        // Editing an account also unlocks it.
+        failedAttempts: const Value(0),
+        lockedUntil: const Value(null),
         updatedAt: Value(DateTime.now()),
       ),
     );

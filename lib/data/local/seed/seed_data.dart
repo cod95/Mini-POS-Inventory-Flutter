@@ -21,7 +21,10 @@ class SeedData {
   /// accounts when they sync.
   Future<void> _ensureUsers() async {
     final existing = await db.select(db.userAccounts).get();
-    if (existing.isNotEmpty) return;
+    if (existing.isNotEmpty) {
+      await _scrubLegacySecrets();
+      return;
+    }
     final settings =
         await (db.select(db.appSettings)..where((t) => t.id.equals(1))).getSingleOrNull();
     await db.into(db.userAccounts).insert(
@@ -29,7 +32,8 @@ class SeedData {
             uuid: 'default-admin',
             name: 'Admin',
             role: 'admin',
-            secret: settings?.adminPassword ?? 'admin123',
+            secret: _orDefault(settings?.adminPassword, 'admin123'),
+            mustChangeSecret: const Value(true),
           ),
           mode: InsertMode.insertOrIgnore,
         );
@@ -38,10 +42,26 @@ class SeedData {
             uuid: 'default-cashier',
             name: 'Cashier',
             role: 'cashier',
-            secret: settings?.cashierPin ?? '1234',
+            secret: _orDefault(settings?.cashierPin, '1234'),
+            mustChangeSecret: const Value(true),
           ),
           mode: InsertMode.insertOrIgnore,
         );
+    await _scrubLegacySecrets();
+  }
+
+  String _orDefault(String? value, String fallback) =>
+      (value == null || value.isEmpty) ? fallback : value;
+
+  /// The old single admin password / cashier PIN lived in plain text inside
+  /// the settings row. Accounts replaced them, so wipe those leftovers.
+  Future<void> _scrubLegacySecrets() async {
+    await (db.update(db.appSettings)..where((t) => t.id.equals(1))).write(
+      const AppSettingsCompanion(
+        cashierPin: Value(''),
+        adminPassword: Value(''),
+      ),
+    );
   }
 
   /// Inserts the default settings row ONLY the very first time the app runs

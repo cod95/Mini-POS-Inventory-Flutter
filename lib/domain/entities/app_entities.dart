@@ -184,6 +184,7 @@ class AuthSession extends Equatable {
     required this.loginTime,
     this.userId,
     this.userName,
+    this.mustChangeSecret = false,
   });
 
   final UserRole role;
@@ -191,8 +192,19 @@ class AuthSession extends Equatable {
   final int? userId;
   final String? userName;
 
+  /// True while the account still uses a default password / PIN.
+  final bool mustChangeSecret;
+
+  AuthSession copyWith({bool? mustChangeSecret}) => AuthSession(
+        role: role,
+        loginTime: loginTime,
+        userId: userId,
+        userName: userName,
+        mustChangeSecret: mustChangeSecret ?? this.mustChangeSecret,
+      );
+
   @override
-  List<Object?> get props => [role, loginTime, userId, userName];
+  List<Object?> get props => [role, loginTime, userId, userName, mustChangeSecret];
 }
 
 /// A login account (admin or cashier).
@@ -202,17 +214,19 @@ class AppUser extends Equatable {
     required this.uuid,
     required this.name,
     required this.role,
-    required this.secret,
     required this.active,
+    this.mustChangeSecret = false,
+    this.lockedUntil,
   });
 
   final int id;
   final String uuid;
   final String name;
   final UserRole role;
-  final String secret;
   final bool active;
+  final bool mustChangeSecret;
+  final DateTime? lockedUntil;
 
   @override
-  List<Object?> get props => [id, uuid, name, role, secret, active];
+  List<Object?> get props => [id, uuid, name, role, active, mustChangeSecret, lockedUntil];
 }

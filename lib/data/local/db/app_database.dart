@@ -224,6 +224,14 @@ class UserAccounts extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// Local only (never synced): wrong-password counter and temporary lock.
+  IntColumn get failedAttempts => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get lockedUntil => dateTime().nullable()();
+
+  /// True while the account still uses a default password / PIN.
+  BoolColumn get mustChangeSecret => boolean().withDefault(const Constant(false))();
 }
 
 class AppSettings extends Table {
@@ -281,6 +289,10 @@ class AppSettings extends Table {
   /// on the main device.
   TextColumn get deviceCode => text().withDefault(const Constant(''))();
 
+  /// Shop code shared by the phones of one shop. Encrypts everything that
+  /// leaves the phone during sync. Local only, never inside a sync package.
+  TextColumn get syncCode => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -303,7 +315,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -356,6 +368,15 @@ class AppDatabase extends _$AppDatabase {
               );
             }
             await customStatement('UPDATE products SET catalog_updated_at = updated_at');
+          }
+          if (from < 11) {
+            await m.addColumn(userAccounts, userAccounts.failedAttempts);
+            await m.addColumn(userAccounts, userAccounts.lockedUntil);
+            await m.addColumn(userAccounts, userAccounts.mustChangeSecret);
+            await m.addColumn(appSettings, appSettings.syncCode);
+            await customStatement(
+              "UPDATE user_accounts SET must_change_secret = 1 WHERE secret IN ('admin123', '1234')",
+            );
           }
         },
       );

@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../core/errors/app_exception.dart';
 import '../../core/models/app_models.dart';
 import '../../domain/entities/app_entities.dart';
 import '../../domain/repositories/repositories.dart';
@@ -64,25 +65,57 @@ class AppCubit extends Cubit<AppState> {
   }
 
   /// Logs in a user chosen by id with his password (admin) or PIN (cashier).
+  /// On failure [AppState.error] is `invalid`, or `locked:<seconds>` while the
+  /// account is locked after too many wrong attempts.
   Future<bool> login(int userId, String secret) async {
     emit(state.copyWith(loading: true, clearError: true));
-    final user = await _authRepository.login(userId, secret.trim());
-    if (user == null) {
-      emit(state.copyWith(loading: false, error: 'Invalid credentials'));
+    try {
+      final user = await _authRepository.login(userId, secret.trim());
+      if (user == null) {
+        emit(state.copyWith(loading: false, error: 'invalid'));
+        return false;
+      }
+      emit(
+        state.copyWith(
+          loading: false,
+          session: AuthSession(
+            role: user.role,
+            loginTime: DateTime.now(),
+            userId: user.id,
+            userName: user.name,
+            mustChangeSecret: user.mustChangeSecret,
+          ),
+        ),
+      );
+      return true;
+    } on LoginLockedException catch (e) {
+      emit(state.copyWith(loading: false, error: 'locked:${e.seconds}'));
+      return false;
+    } catch (e) {
+      emit(state.copyWith(loading: false, error: 'invalid'));
       return false;
     }
-    emit(
-      state.copyWith(
-        loading: false,
-        session: AuthSession(
-          role: user.role,
-          loginTime: DateTime.now(),
-          userId: user.id,
-          userName: user.name,
-        ),
-      ),
-    );
-    return true;
+  }
+
+  /// Changes the logged-in user's password / PIN. Returns an error message,
+  /// or null on success.
+  Future<String?> changeOwnSecret(String newSecret, {String? currentSecret}) async {
+    final session = state.session;
+    final userId = session?.userId;
+    if (session == null || userId == null) return 'Not logged in';
+    try {
+      await _authRepository.changeSecret(
+        userId: userId,
+        newSecret: newSecret,
+        currentSecret: currentSecret,
+      );
+      emit(state.copyWith(session: session.copyWith(mustChangeSecret: false)));
+      return null;
+    } on AppException catch (e) {
+      return e.message;
+    } catch (e) {
+      return e.toString();
+    }
   }
 
   Future<void> logout() async {

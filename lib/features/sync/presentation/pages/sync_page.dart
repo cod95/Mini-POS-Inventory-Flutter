@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/app_scope.dart';
@@ -23,8 +24,106 @@ class _SyncPageState extends State<SyncPage> {
   bool _busy = false;
   String? _message;
   bool _isError = false;
+  String? _code;
+  bool _codeLoaded = false;
 
   bool get _ar => context.l10n.isArabic;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_codeLoaded) {
+      _codeLoaded = true;
+      _loadCode();
+    }
+  }
+
+  Future<void> _loadCode() async {
+    final code = await AppScope.of(context).fileSyncService.getSyncCode();
+    if (mounted) setState(() => _code = code);
+  }
+
+  Future<void> _createCode() async {
+    final service = AppScope.of(context).fileSyncService;
+    if (_code != null) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(_ar ? 'رمز جديد؟' : 'New code?'),
+          content: Text(_ar
+              ? 'الأجهزة التانية لازم تدخل الرمز الجديد، وإلا ما رح تقدر تقرا ملفاتك.'
+              : 'The other phones must enter the new code, otherwise they cannot read your files.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(_ar ? 'إلغاء' : 'Cancel')),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(_ar ? 'تغيير' : 'Change')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    await service.createSyncCode();
+    await _loadCode();
+  }
+
+  Future<void> _enterCode() async {
+    final service = AppScope.of(context).fileSyncService;
+    final controller = TextEditingController();
+    String? error;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(_ar ? 'رمز المحل' : 'Shop code'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  hintText: 'XXXX-XXXX-XXXX',
+                  helperText: _ar ? 'الرمز الظاهر عند الأدمن بشاشة المزامنة' : 'Shown on the admin phone in this screen',
+                  errorText: error,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(_ar ? 'إلغاء' : 'Cancel')),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  await service.setSyncCode(controller.text);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                } on FormatException {
+                  setLocal(() => error = _ar ? 'الرمز غير صحيح' : 'Invalid code');
+                }
+              },
+              child: Text(_ar ? 'حفظ' : 'Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    await _loadCode();
+  }
+
+  String _describe(Object e) {
+    if (e is FormatException) {
+      switch (e.message) {
+        case 'NO_SYNC_CODE':
+          return _ar ? 'حط رمز المحل أول شي.' : 'Set the shop code first.';
+        case 'WRONG_CODE':
+          return _ar
+              ? 'رمز المحل مختلف أو الملف تالف. تأكد إن الجهازين عندن نفس الرمز.'
+              : 'Different shop code or damaged file. Make sure both phones use the same code.';
+        case 'NOT_A_SYNC_FILE':
+          return _ar ? 'هاد الملف مش ملف مزامنة صحيح.' : 'This is not a valid sync file.';
+      }
+    }
+    return e.toString();
+  }
 
   Future<void> _export() async {
     final deps = AppScope.of(context);
@@ -33,7 +132,8 @@ class _SyncPageState extends State<SyncPage> {
       _message = null;
     });
     try {
-      final file = await deps.fileSyncService.exportToFile(includeAdminData: true);
+      final isAdmin = context.read<AppCubit>().isAdmin;
+      final file = await deps.fileSyncService.exportToFile(includeAdminData: isAdmin);
       await deps.fileSyncService.shareFile(file);
       setState(() {
         _isError = false;
@@ -42,7 +142,7 @@ class _SyncPageState extends State<SyncPage> {
     } catch (e) {
       setState(() {
         _isError = true;
-        _message = e.toString();
+        _message = _describe(e);
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -69,15 +169,10 @@ class _SyncPageState extends State<SyncPage> {
         _isError = false;
         _message = _ar ? 'تمت المزامنة.' : 'Sync complete.';
       });
-    } on FormatException {
-      setState(() {
-        _isError = true;
-        _message = _ar ? 'هاد الملف مش ملف مزامنة صحيح.' : 'This is not a valid sync file.';
-      });
     } catch (e) {
       setState(() {
         _isError = true;
-        _message = e.toString();
+        _message = _describe(e);
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -133,6 +228,66 @@ class _SyncPageState extends State<SyncPage> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.vpn_key_outlined),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(ar ? 'رمز المحل' : 'Shop code', style: Theme.of(context).textTheme.titleMedium),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  if (_code != null)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SelectableText(
+                            _code!,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(letterSpacing: 2),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.copy),
+                          onPressed: () => Clipboard.setData(ClipboardData(text: _code!)),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      ar
+                          ? 'لسا ما في رمز. على تلفون الأدمن اضغط "إنشاء رمز"، وعلى باقي التلفونات "إدخال الرمز".'
+                          : 'No code yet. On the admin phone tap "Create code", on the other phones "Enter code".',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    ar
+                        ? 'كل ملفات المزامنة بتتشفّر بهالرمز. نفس الرمز لازم يكون عند كل تلفونات المحل.'
+                        : 'Every sync file is encrypted with this code. All phones of the shop must use the same one.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    children: [
+                      if (context.read<AppCubit>().isAdmin)
+                        OutlinedButton(
+                          onPressed: _createCode,
+                          child: Text(_code == null ? (ar ? 'إنشاء رمز' : 'Create code') : (ar ? 'رمز جديد' : 'New code')),
+                        ),
+                      OutlinedButton(onPressed: _enterCode, child: Text(ar ? 'إدخال الرمز' : 'Enter code')),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),

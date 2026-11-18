@@ -221,6 +221,15 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: AppSpacing.md),
               Card(
                 child: ListTile(
+                  leading: const Icon(Icons.lock_outline),
+                  title: Text(l10n.isArabic ? 'تغيير كلمة السر' : 'Change my password'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/password'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Card(
+                child: ListTile(
                   leading: const Icon(Icons.people_outline),
                   title: Text(l10n.isArabic ? 'المستخدمين' : 'Users'),
                   subtitle: Text(

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/models/app_models.dart';
+import '../../features/auth/presentation/pages/change_secret_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/data_tools/presentation/pages/data_tools_page.dart';
 import '../../features/invoices/presentation/pages/invoice_detail_page.dart';
@@ -31,6 +32,14 @@ class AppRouter {
             if (!isAuthenticated && !isLoginRoute) {
               return '/login';
             }
+            final mustChange = dependencies.appCubit.state.session?.mustChangeSecret ?? false;
+            final path0 = state.uri.path;
+            if (isAuthenticated && mustChange && path0 != '/change-secret') {
+              return '/change-secret';
+            }
+            if (isAuthenticated && !mustChange && path0 == '/change-secret') {
+              return '/pos';
+            }
             if (isAuthenticated && isLoginRoute) {
               return '/pos';
             }
@@ -40,7 +49,8 @@ class AppRouter {
             if (session != null && session.role != UserRole.admin) {
               final path = state.uri.path;
               const adminOnly = ['/products', '/reports', '/settings/'];
-              if (adminOnly.any(path.startsWith)) {
+              final cashierOk = path.startsWith('/settings/sync');
+              if (!cashierOk && adminOnly.any(path.startsWith)) {
                 return '/pos';
               }
             }
@@ -50,6 +60,14 @@ class AppRouter {
             GoRoute(
               path: '/login',
               builder: (context, state) => const LoginPage(),
+            ),
+            GoRoute(
+              path: '/change-secret',
+              builder: (context, state) => const ChangeSecretPage(forced: true),
+            ),
+            GoRoute(
+              path: '/password',
+              builder: (context, state) => const ChangeSecretPage(forced: false),
             ),
             ShellRoute(
               builder: (context, state, child) {
