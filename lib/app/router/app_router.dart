@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/data_tools/presentation/pages/data_tools_page.dart';
 import '../../features/invoices/presentation/pages/invoice_detail_page.dart';
 import '../../features/invoices/presentation/pages/invoices_page.dart';
 import '../../features/pos/presentation/pages/pos_page.dart';
@@ -78,6 +79,12 @@ class AppRouter {
                 GoRoute(
                   path: '/settings',
                   builder: (context, state) => const SettingsPage(),
+                  routes: [
+                    GoRoute(
+                      path: 'data',
+                      builder: (context, state) => const DataToolsPage(),
+                    ),
+                  ],
                 ),
               ],
             ),
