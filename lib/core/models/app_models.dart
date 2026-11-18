@@ -6,7 +6,7 @@ enum StockMovementType { add, remove, adjust, purchase, sale, returnSale }
 
 enum PaymentMethod { cash, card, split }
 
-enum SaleStatus { completed, returned }
+enum SaleStatus { completed, partiallyReturned, returned, cancelled }
 
 extension PaymentMethodX on PaymentMethod {
   String get value {
@@ -33,8 +33,12 @@ extension SaleStatusX on SaleStatus {
     switch (this) {
       case SaleStatus.completed:
         return 'completed';
+      case SaleStatus.partiallyReturned:
+        return 'partial';
       case SaleStatus.returned:
         return 'returned';
+      case SaleStatus.cancelled:
+        return 'cancelled';
     }
   }
 
@@ -362,14 +366,18 @@ class InvoiceFilter extends Equatable {
     this.from,
     this.to,
     this.paymentMethod,
+    this.search,
   });
 
   final DateTime? from;
   final DateTime? to;
   final PaymentMethod? paymentMethod;
 
+  /// Free text matched against invoice number and customer name.
+  final String? search;
+
   @override
-  List<Object?> get props => [from, to, paymentMethod];
+  List<Object?> get props => [from, to, paymentMethod, search];
 }
 
 class SaleSummary extends Equatable {
@@ -380,6 +388,7 @@ class SaleSummary extends Equatable {
     required this.total,
     required this.paymentMethod,
     required this.status,
+    this.customerName,
   });
 
   final int id;
@@ -388,9 +397,14 @@ class SaleSummary extends Equatable {
   final double total;
   final PaymentMethod paymentMethod;
   final SaleStatus status;
+  final String? customerName;
+
+  /// Return documents (RET-…) have negative totals.
+  bool get isReturnDocument => invoiceNo.startsWith('RET-');
 
   @override
-  List<Object?> get props => [id, invoiceNo, createdAt, total, paymentMethod, status];
+  List<Object?> get props =>
+      [id, invoiceNo, createdAt, total, paymentMethod, status, customerName];
 }
 
 class ReturnItemInput extends Equatable {

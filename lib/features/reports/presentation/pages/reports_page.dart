@@ -10,6 +10,7 @@ import '../../../../core/state/app_cubit.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/cards.dart';
 import '../../../../core/widgets/states.dart';
+import '../../../invoices/presentation/invoice_status.dart';
 import '../cubit/reports_cubit.dart';
 
 class ReportsPage extends StatelessWidget {
@@ -523,15 +524,6 @@ class _InvoiceHistoryCard extends StatelessWidget {
   final String currency;
   final double exchangeRate;
 
-  Color _statusColor(SaleStatus status) {
-    switch (status) {
-      case SaleStatus.completed:
-        return Colors.green;
-      case SaleStatus.returned:
-        return Colors.orange;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -557,8 +549,15 @@ class _InvoiceHistoryCard extends StatelessWidget {
                       Text(AppFormatters.money(invoice.total, currency: currency, exchangeRate: exchangeRate)),
                       const SizedBox(width: AppSpacing.sm),
                       StatusChip(
-                        label: context.l10n.tr(invoice.status == SaleStatus.returned ? 'statusReturned' : 'statusCompleted'),
-                        color: _statusColor(invoice.status),
+                        label: invoiceStatusLabel(
+                          invoice.status,
+                          arabic: context.l10n.isArabic,
+                          isReturnDocument: invoice.isReturnDocument,
+                        ),
+                        color: invoiceStatusColor(
+                          invoice.status,
+                          isReturnDocument: invoice.isReturnDocument,
+                        ),
                       ),
                     ],
                   ),

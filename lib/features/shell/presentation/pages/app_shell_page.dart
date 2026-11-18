@@ -13,7 +13,7 @@ class AppShellPage extends StatelessWidget {
   final String currentPath;
   final Widget child;
 
-  static const _tabs = ['/pos', '/products', '/reports', '/settings'];
+  static const _tabs = ['/pos', '/invoices', '/products', '/reports', '/settings'];
 
   int get _currentIndex {
     for (var i = 0; i < _tabs.length; i++) {
@@ -31,6 +31,10 @@ class AppShellPage extends StatelessWidget {
         selectedIndex: _currentIndex,
         destinations: [
           NavigationDestination(icon: const Icon(Icons.point_of_sale), label: l10n.tr('pos')),
+          NavigationDestination(
+            icon: const Icon(Icons.receipt_long_outlined),
+            label: l10n.isArabic ? 'الفواتير' : 'Invoices',
+          ),
           NavigationDestination(icon: const Icon(Icons.inventory_2_outlined), label: l10n.tr('products')),
           NavigationDestination(icon: const Icon(Icons.assessment_outlined), label: l10n.tr('reports')),
           NavigationDestination(icon: const Icon(Icons.settings_outlined), label: l10n.tr('settings')),

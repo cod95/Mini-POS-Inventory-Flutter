@@ -131,6 +131,10 @@ abstract class SalesRepository {
     required int saleId,
     required List<ReturnItemInput> items,
   });
+
+  /// Voids a sale that has no returns: stock is restored and the invoice is
+  /// excluded from every report.
+  Future<void> cancelSale(int saleId);
 }
 
 abstract class ReportsRepository {

@@ -497,11 +497,31 @@ class LocalSalesRepository implements SalesRepository {
     final items = await (_db.select(_db.saleItems)
           ..where((tbl) => tbl.saleId.equals(saleId)))
         .get();
+    final returned = await _returnedQtyByItem(saleId);
 
     return SaleDetailView(
       sale: _toSaleView(sale),
       items: items.map(_toSaleItemView).toList(),
+      returnedQtyByItemId: returned,
     );
+  }
+
+  /// saleItemId -> total quantity already returned from that line.
+  Future<Map<int, int>> _returnedQtyByItem(int saleId) async {
+    final returnDocs = await (_db.select(_db.sales)
+          ..where((tbl) => tbl.originalSaleId.equals(saleId)))
+        .get();
+    if (returnDocs.isEmpty) return {};
+    final rows = await (_db.select(_db.saleItems)
+          ..where((tbl) => tbl.saleId.isIn(returnDocs.map((e) => e.id).toList())))
+        .get();
+    final map = <int, int>{};
+    for (final row in rows) {
+      final key = row.originalItemId;
+      if (key == null) continue;
+      map[key] = (map[key] ?? 0) + row.qty.abs();
+    }
+    return map;
   }
 
   @override
@@ -509,6 +529,7 @@ class LocalSalesRepository implements SalesRepository {
     final sales = await (_db.select(_db.sales)
           ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)]))
         .get();
+    final query = filter.search?.trim().toLowerCase() ?? '';
 
     return sales
         .where((sale) {
@@ -517,7 +538,10 @@ class LocalSalesRepository implements SalesRepository {
               filter.to == null || !sale.createdAt.isAfter(filter.to!.add(const Duration(days: 1)));
           final matchesPayment = filter.paymentMethod == null ||
               sale.paymentMethod == filter.paymentMethod!.value;
-          return matchesFrom && matchesTo && matchesPayment;
+          final matchesSearch = query.isEmpty ||
+              sale.invoiceNo.toLowerCase().contains(query) ||
+              (sale.customerName ?? '').toLowerCase().contains(query);
+          return matchesFrom && matchesTo && matchesPayment && matchesSearch;
         })
         .map(
           (sale) => SaleSummary(
@@ -527,6 +551,7 @@ class LocalSalesRepository implements SalesRepository {
             total: sale.total,
             paymentMethod: PaymentMethodX.fromValue(sale.paymentMethod),
             status: SaleStatusX.fromValue(sale.status),
+            customerName: sale.customerName,
           ),
         )
         .toList();
@@ -544,16 +569,65 @@ class LocalSalesRepository implements SalesRepository {
       if (sale == null) {
         throw AppException('Sale not found');
       }
+      if (sale.invoiceNo.startsWith('RET-')) {
+        throw AppException('A return document cannot be returned');
+      }
+      if (sale.status == SaleStatus.cancelled.value) {
+        throw AppException('This invoice was cancelled');
+      }
 
       final saleItems = await (_db.select(_db.saleItems)
             ..where((tbl) => tbl.saleId.equals(saleId)))
           .get();
       final saleItemById = {for (final item in saleItems) item.id: item};
+      final alreadyReturned = await _returnedQtyByItem(saleId);
 
-      double totalReturn = 0;
-      double discountReturn = 0;
+      // Amounts already refunded by earlier return documents of this sale.
+      final previousReturns = await (_db.select(_db.sales)
+            ..where((tbl) => tbl.originalSaleId.equals(saleId)))
+          .get();
+      final prevNet =
+          previousReturns.fold<double>(0, (sum, r) => sum + (-(r.total - r.taxTotal)));
+      final prevTax = previousReturns.fold<double>(0, (sum, r) => sum + (-r.taxTotal));
+
+      // The invoice may carry an order-level discount and TVA that are not
+      // part of each line: refund them proportionally so that returning
+      // everything refunds exactly what the customer paid.
+      final netSale = sale.total - sale.taxTotal;
+      final factor = sale.subtotal > 0 ? netSale / sale.subtotal : 1.0;
+      final taxableBase =
+          saleItems.where((i) => i.taxable).fold<double>(0, (sum, i) => sum + i.lineTotal);
+      final taxRatio = (taxableBase > 0 && sale.taxTotal > 0) ? sale.taxTotal / taxableBase : 0.0;
+
+      // Validate first.
+      final thisReturn = <int, int>{};
+      for (final input in items) {
+        final original = saleItemById[input.saleItemId];
+        if (original == null) {
+          throw AppException('Invalid return item');
+        }
+        final available = original.qty - (alreadyReturned[original.id] ?? 0);
+        if (input.qty <= 0 || input.qty > available) {
+          throw AppException('Invalid return quantity for ${original.nameSnapshot}');
+        }
+        thisReturn[original.id] = (thisReturn[original.id] ?? 0) + input.qty;
+      }
+      for (final entry in thisReturn.entries) {
+        final original = saleItemById[entry.key]!;
+        final available = original.qty - (alreadyReturned[original.id] ?? 0);
+        if (entry.value > available) {
+          throw AppException('Invalid return quantity for ${original.nameSnapshot}');
+        }
+      }
+
+      final remainingAfter = saleItems.fold<int>(
+        0,
+        (sum, item) =>
+            sum + item.qty - (alreadyReturned[item.id] ?? 0) - (thisReturn[item.id] ?? 0),
+      );
+      final fullyReturned = remainingAfter <= 0;
+
       final now = DateTime.now();
-
       final returnInvoice = await _nextReturnInvoiceNo(now);
       final returnSaleId = await _db.into(_db.sales).insert(
             SalesCompanion.insert(
@@ -571,25 +645,28 @@ class LocalSalesRepository implements SalesRepository {
               status: SaleStatus.returned.value,
               secondaryCurrencyCode: Value(sale.secondaryCurrencyCode),
               exchangeRateAtSale: Value(sale.exchangeRateAtSale),
+              originalSaleId: Value(saleId),
             ),
           );
 
-      for (final returnInput in items) {
-        final original = saleItemById[returnInput.saleItemId];
-        if (original == null) {
-          throw AppException('Invalid return item');
-        }
-        if (returnInput.qty <= 0 || returnInput.qty > original.qty.abs()) {
-          throw AppException('Invalid return quantity for ${original.nameSnapshot}');
-        }
+      double sumBase = 0;
+      double sumNet = 0;
+      double taxRefund = 0;
 
-        final perUnitLine = original.lineTotal / max(1, original.qty.abs());
-        final perUnitDiscount = original.discount / max(1, original.qty.abs());
-        final returnLineTotal = MoneyCalculator.round2(-perUnitLine * returnInput.qty);
-        final returnDiscount = MoneyCalculator.round2(perUnitDiscount * returnInput.qty);
+      for (final entry in thisReturn.entries) {
+        final original = saleItemById[entry.key]!;
+        final qty = entry.value;
 
-        totalReturn += returnLineTotal;
-        discountReturn += returnDiscount;
+        final perUnitLine = original.lineTotal / max(1, original.qty);
+        final perUnitDiscount = original.discount / max(1, original.qty);
+        final base = MoneyCalculator.round2(perUnitLine * qty);
+        final discount = MoneyCalculator.round2(perUnitDiscount * qty);
+
+        sumBase += base;
+        sumNet += MoneyCalculator.round2(base * factor);
+        if (original.taxable) {
+          taxRefund += MoneyCalculator.round2(base * taxRatio);
+        }
 
         await _db.into(_db.saleItems).insert(
               SaleItemsCompanion.insert(
@@ -598,10 +675,11 @@ class LocalSalesRepository implements SalesRepository {
                 nameSnapshot: original.nameSnapshot,
                 costSnapshot: original.costSnapshot,
                 priceSnapshot: original.priceSnapshot,
-                qty: -returnInput.qty,
-                discount: Value(returnDiscount),
-                lineTotal: returnLineTotal,
+                qty: -qty,
+                discount: Value(discount),
+                lineTotal: -base,
                 taxable: Value(original.taxable),
+                originalItemId: Value(original.id),
               ),
             );
 
@@ -611,7 +689,7 @@ class LocalSalesRepository implements SalesRepository {
         if (product != null) {
           await (_db.update(_db.products)..where((tbl) => tbl.id.equals(product.id))).write(
             ProductsCompanion(
-              stockQty: Value(product.stockQty + returnInput.qty),
+              stockQty: Value(product.stockQty + qty),
               updatedAt: Value(now),
             ),
           );
@@ -620,7 +698,7 @@ class LocalSalesRepository implements SalesRepository {
                 StockMovementsCompanion.insert(
                   productId: product.id,
                   type: StockMovementType.returnSale.value,
-                  qtyChange: returnInput.qty,
+                  qtyChange: qty,
                   reason: Value('Return ${sale.invoiceNo}'),
                   createdAt: Value(now),
                 ),
@@ -628,21 +706,96 @@ class LocalSalesRepository implements SalesRepository {
         }
       }
 
+      if (fullyReturned) {
+        // Remove rounding drift: the sum of all returns equals the invoice.
+        sumNet = MoneyCalculator.round2(netSale - prevNet);
+        taxRefund = MoneyCalculator.round2(sale.taxTotal - prevTax);
+      }
+      sumBase = MoneyCalculator.round2(sumBase);
+      sumNet = MoneyCalculator.round2(sumNet);
+      taxRefund = MoneyCalculator.round2(taxRefund);
+      final returnTotal = -MoneyCalculator.round2(sumNet + taxRefund);
+
       await (_db.update(_db.sales)..where((tbl) => tbl.id.equals(returnSaleId))).write(
         SalesCompanion(
-          subtotal: Value(totalReturn),
-          discountTotal: Value(discountReturn),
-          taxTotal: const Value(0),
-          total: Value(totalReturn),
+          subtotal: Value(-sumBase),
+          discountTotal: Value(MoneyCalculator.round2(max(0, sumBase - sumNet))),
+          taxTotal: Value(-taxRefund),
+          total: Value(returnTotal),
+          paid: Value(returnTotal),
           status: Value(SaleStatus.returned.value),
         ),
       );
 
       await (_db.update(_db.sales)..where((tbl) => tbl.id.equals(saleId))).write(
-        SalesCompanion(status: Value(SaleStatus.returned.value)),
+        SalesCompanion(
+          status: Value(
+            fullyReturned ? SaleStatus.returned.value : SaleStatus.partiallyReturned.value,
+          ),
+        ),
       );
 
       return ReturnResult(returnSaleId: returnSaleId, invoiceNo: returnInvoice);
+    });
+  }
+
+  @override
+  Future<void> cancelSale(int saleId) {
+    return _db.transaction(() async {
+      final sale = await (_db.select(_db.sales)..where((tbl) => tbl.id.equals(saleId)))
+          .getSingleOrNull();
+      if (sale == null) {
+        throw AppException('Sale not found');
+      }
+      if (sale.invoiceNo.startsWith('RET-')) {
+        throw AppException('A return document cannot be cancelled');
+      }
+      if (sale.status != SaleStatus.completed.value) {
+        throw AppException('Only an invoice with no returns can be cancelled');
+      }
+
+      final now = DateTime.now();
+      final saleItems = await (_db.select(_db.saleItems)
+            ..where((tbl) => tbl.saleId.equals(saleId)))
+          .get();
+
+      for (final item in saleItems) {
+        final product = await (_db.select(_db.products)
+              ..where((tbl) => tbl.id.equals(item.productId)))
+            .getSingleOrNull();
+        if (product == null) continue;
+        await (_db.update(_db.products)..where((tbl) => tbl.id.equals(product.id))).write(
+          ProductsCompanion(
+            stockQty: Value(product.stockQty + item.qty),
+            updatedAt: Value(now),
+          ),
+        );
+        await _db.into(_db.stockMovements).insert(
+              StockMovementsCompanion.insert(
+                productId: product.id,
+                type: StockMovementType.returnSale.value,
+                qtyChange: item.qty,
+                reason: Value('Cancel ${sale.invoiceNo}'),
+                createdAt: Value(now),
+              ),
+            );
+      }
+
+      // Undo the credit balance added at checkout for unpaid sales.
+      if (sale.customerId != null && sale.paid < sale.total) {
+        final customer = await (_db.select(_db.customers)
+              ..where((tbl) => tbl.id.equals(sale.customerId!)))
+            .getSingleOrNull();
+        if (customer != null) {
+          await (_db.update(_db.customers)..where((tbl) => tbl.id.equals(customer.id))).write(
+            CustomersCompanion(balance: Value(customer.balance - (sale.total - sale.paid))),
+          );
+        }
+      }
+
+      await (_db.update(_db.sales)..where((tbl) => tbl.id.equals(saleId))).write(
+        SalesCompanion(status: Value(SaleStatus.cancelled.value)),
+      );
     });
   }
 
@@ -678,6 +831,7 @@ class LocalSalesRepository implements SalesRepository {
       status: SaleStatusX.fromValue(sale.status),
       secondaryCurrencyCode: sale.secondaryCurrencyCode,
       exchangeRateAtSale: sale.exchangeRateAtSale,
+      originalSaleId: sale.originalSaleId,
     );
   }
 
@@ -712,18 +866,27 @@ class LocalReportsRepository implements ReportsRepository {
   final AppDatabase _db;
   final ProductRepository _productRepository;
 
-  /// Only completed invoices are real sales. A returned invoice (the original
-  /// sale is flagged 'returned') and its RET- document are both excluded
-  /// from sales, cost, profit and invoice counts.
-  static bool _isCompletedSale(Sale sale) => sale.status == SaleStatus.completed.value;
+  /// Money ledger: every document that is not a cancelled invoice. Original
+  /// invoices count with their full value and each return document (RET-…,
+  /// negative amounts/quantities) cancels its share, so sales, cost and
+  /// profit are always NET of returns.
+  static bool _isLedgerDoc(Sale sale) => sale.status != SaleStatus.cancelled.value;
 
   /// Return documents created by returnItems() (RET-… invoice numbers).
-  static bool _isReturnDocument(Sale sale) =>
-      sale.status == SaleStatus.returned.value && sale.invoiceNo.startsWith('RET-');
+  static bool _isReturnDocument(Sale sale) => sale.invoiceNo.startsWith('RET-');
 
-  /// Net sale value: after item + order discounts, without TVA.
+  /// Invoices that still count in "number of invoices": real sales that are
+  /// not fully returned and not cancelled.
+  static bool _isCountedInvoice(Sale sale) =>
+      !_isReturnDocument(sale) &&
+      (sale.status == SaleStatus.completed.value ||
+          sale.status == SaleStatus.partiallyReturned.value);
+
+  /// Net sale value: after item + order discounts, without TVA. Negative for
+  /// return documents.
   static double _netSales(Sale sale) => sale.total - sale.taxTotal;
 
+  /// Cost of goods: negative for returned (negative-qty) rows.
   static double _itemsCost(Iterable<SaleItem> items) =>
       items.fold(0.0, (sum, item) => sum + item.costSnapshot * item.qty);
 
@@ -731,7 +894,7 @@ class LocalReportsRepository implements ReportsRepository {
   Future<DashboardMetrics> getDashboardMetrics({DateTime? since}) async {
     final allSales = await _db.select(_db.sales).get();
     final sales = allSales
-        .where(_isCompletedSale)
+        .where(_isLedgerDoc)
         .where((s) => since == null || !s.createdAt.isBefore(since))
         .toList();
     final saleIds = sales.map((e) => e.id).toSet();
@@ -755,25 +918,25 @@ class LocalReportsRepository implements ReportsRepository {
     final todaySales = todaySalesRows.fold(0.0, (sum, e) => sum + _netSales(e));
     final monthSales = monthSalesRows.fold(0.0, (sum, e) => sum + _netSales(e));
 
-    // Profit = Sales - Cost, i.e. Σ qty × (sale price - cost price) minus
-    // discounts. Never the invoice totals themselves.
+    // Profit = Net sales - Cost (both already net of returns).
     final todayProfit = MoneyCalculator.round2(todaySales - _itemsCost(todayItems));
     final monthProfit = MoneyCalculator.round2(monthSales - _itemsCost(monthItems));
 
     final qtyMap = <String, int>{};
     for (final item in monthItems) {
-      qtyMap[item.nameSnapshot] = (qtyMap[item.nameSnapshot] ?? 0) + item.qty.abs();
+      qtyMap[item.nameSnapshot] = (qtyMap[item.nameSnapshot] ?? 0) + item.qty;
     }
     final bestSellers = qtyMap.entries
+        .where((entry) => entry.value > 0)
         .map((entry) => BestSellerMetric(productName: entry.key, qty: entry.value))
         .toList()
       ..sort((a, b) => b.qty.compareTo(a.qty));
 
     return DashboardMetrics(
       todaySales: MoneyCalculator.round2(todaySales),
-      todayInvoices: todayIds.length,
+      todayInvoices: todaySalesRows.where(_isCountedInvoice).length,
       monthSales: MoneyCalculator.round2(monthSales),
-      monthInvoices: monthIds.length,
+      monthInvoices: monthSalesRows.where(_isCountedInvoice).length,
       todayProfit: todayProfit,
       monthProfit: monthProfit,
       bestSellers: bestSellers.take(5).toList(),
@@ -789,20 +952,20 @@ class LocalReportsRepository implements ReportsRepository {
       return fromOk && toOk;
     }).toList();
 
-    final completed = inRange.where(_isCompletedSale).toList();
+    final ledger = inRange.where(_isLedgerDoc).toList();
     final returns = inRange.where(_isReturnDocument).toList();
 
-    final completedIds = completed.map((e) => e.id).toSet();
-    final items = completedIds.isEmpty
+    final ledgerIds = ledger.map((e) => e.id).toSet();
+    final items = ledgerIds.isEmpty
         ? const <SaleItem>[]
-        : await (_db.select(_db.saleItems)..where((tbl) => tbl.saleId.isIn(completedIds.toList()))).get();
+        : await (_db.select(_db.saleItems)..where((tbl) => tbl.saleId.isIn(ledgerIds.toList()))).get();
 
     return PeriodSummary(
-      invoiceCount: completed.length,
-      totalSales: MoneyCalculator.round2(completed.fold(0.0, (sum, e) => sum + _netSales(e))),
+      invoiceCount: ledger.where(_isCountedInvoice).length,
+      totalSales: MoneyCalculator.round2(ledger.fold(0.0, (sum, e) => sum + _netSales(e))),
       totalCost: MoneyCalculator.round2(_itemsCost(items)),
       returnCount: returns.length,
-      totalReturns: MoneyCalculator.round2(returns.fold(0.0, (sum, e) => sum + e.total.abs())),
+      totalReturns: MoneyCalculator.round2(returns.fold(0.0, (sum, e) => sum + _netSales(e).abs())),
     );
   }
 
@@ -831,7 +994,7 @@ class LocalReportsRepository implements ReportsRepository {
   Future<List<SalesByProductMetric>> salesByProduct({DateTime? from, DateTime? to}) async {
     final sales = await _db.select(_db.sales).get();
     final saleIds = sales
-        .where(_isCompletedSale)
+        .where(_isLedgerDoc)
         .where((sale) {
           final fromOk = from == null || !sale.createdAt.isBefore(from);
           final toOk = to == null || !sale.createdAt.isAfter(to.add(const Duration(days: 1)));
@@ -850,12 +1013,12 @@ class LocalReportsRepository implements ReportsRepository {
       metrics[item.productId] = SalesByProductMetric(
         productId: item.productId,
         productName: item.nameSnapshot,
-        qty: (existing?.qty ?? 0) + item.qty.abs(),
+        qty: (existing?.qty ?? 0) + item.qty,
         total: MoneyCalculator.round2((existing?.total ?? 0) + item.lineTotal),
       );
     }
 
-    final list = metrics.values.toList()..sort((a, b) => b.total.compareTo(a.total));
+    final list = metrics.values.where((m) => m.qty != 0).toList()..sort((a, b) => b.total.compareTo(a.total));
     return list;
   }
 

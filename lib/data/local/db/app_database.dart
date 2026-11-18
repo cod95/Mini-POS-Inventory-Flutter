@@ -143,6 +143,10 @@ class Sales extends Table {
   /// Independent of [customerId] (which is only used for the credit/balance
   /// ledger) — most walk-in sales will leave this blank.
   TextColumn get customerName => text().nullable()();
+
+  /// For return documents (RET-…): the id of the original sale being
+  /// returned. Null for ordinary sales.
+  IntColumn get originalSaleId => integer().nullable()();
 }
 
 class SaleItems extends Table {
@@ -167,6 +171,10 @@ class SaleItems extends Table {
 
   /// Snapshot of whether TVA applied to this item at the time of sale.
   BoolColumn get taxable => boolean().withDefault(const Constant(false))();
+
+  /// For rows of a return document: the sale item being returned. Used to
+  /// know how much of each original line was already returned.
+  IntColumn get originalItemId => integer().nullable()();
 }
 
 class AppSettings extends Table {
@@ -237,7 +245,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -267,6 +275,10 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(appSettings, appSettings.printerMacAddress);
             await m.addColumn(appSettings, appSettings.printerName);
             await m.addColumn(appSettings, appSettings.printerPaperWidthMm);
+          }
+          if (from < 8) {
+            await m.addColumn(sales, sales.originalSaleId);
+            await m.addColumn(saleItems, saleItems.originalItemId);
           }
         },
       );

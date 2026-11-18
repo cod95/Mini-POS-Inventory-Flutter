@@ -113,6 +113,7 @@ class SaleView extends Equatable {
     required this.status,
     required this.secondaryCurrencyCode,
     required this.exchangeRateAtSale,
+    this.originalSaleId,
   });
 
   final int id;
@@ -130,6 +131,9 @@ class SaleView extends Equatable {
   final SaleStatus status;
   final String secondaryCurrencyCode;
   final double exchangeRateAtSale;
+  final int? originalSaleId;
+
+  bool get isReturnDocument => invoiceNo.startsWith('RET-');
 
   @override
   List<Object?> get props => [
@@ -148,17 +152,28 @@ class SaleView extends Equatable {
         status,
         secondaryCurrencyCode,
         exchangeRateAtSale,
+        originalSaleId,
       ];
 }
 
 class SaleDetailView extends Equatable {
-  const SaleDetailView({required this.sale, required this.items});
+  const SaleDetailView({
+    required this.sale,
+    required this.items,
+    this.returnedQtyByItemId = const {},
+  });
 
   final SaleView sale;
   final List<SaleItemView> items;
 
+  /// saleItemId -> quantity already returned from that line.
+  final Map<int, int> returnedQtyByItemId;
+
+  int returnableQty(SaleItemView item) =>
+      item.qty - (returnedQtyByItemId[item.id] ?? 0);
+
   @override
-  List<Object?> get props => [sale, items];
+  List<Object?> get props => [sale, items, returnedQtyByItemId];
 }
 
 class AuthSession extends Equatable {

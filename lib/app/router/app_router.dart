@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/invoices/presentation/pages/invoice_detail_page.dart';
+import '../../features/invoices/presentation/pages/invoices_page.dart';
 import '../../features/pos/presentation/pages/pos_page.dart';
 import '../../features/products/presentation/pages/products_page.dart';
 import '../../features/reports/presentation/pages/reports_page.dart';
@@ -43,6 +44,19 @@ class AppRouter {
                 GoRoute(
                   path: '/pos',
                   builder: (context, state) => const PosPage(),
+                ),
+                GoRoute(
+                  path: '/invoices',
+                  builder: (context, state) => const InvoicesPage(),
+                  routes: [
+                    GoRoute(
+                      path: 'invoice/:id',
+                      builder: (context, state) {
+                        final id = int.tryParse(state.pathParameters['id'] ?? '');
+                        return InvoiceDetailPage(saleId: id ?? 0);
+                      },
+                    ),
+                  ],
                 ),
                 GoRoute(
                   path: '/products',
