@@ -28,7 +28,7 @@ class AccountPage extends StatelessWidget {
                 child: ListTile(
                   leading: const Icon(Icons.person),
                   title: Text(state.session?.userName ?? ''),
-                  subtitle: Text(ar ? 'كاشير' : 'Cashier'),
+                  subtitle: Text(ar ? 'أمين صندوق' : 'Cashier'),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -48,19 +48,19 @@ class AccountPage extends StatelessWidget {
               FilledButton.icon(
                 onPressed: () => context.push('/settings/sync'),
                 icon: const Icon(Icons.sync),
-                label: Text(ar ? 'المزامنة مع الأدمن' : 'Sync with admin'),
+                label: Text(ar ? 'المزامنة مع المدير' : 'Sync with admin'),
               ),
               const SizedBox(height: AppSpacing.sm),
               OutlinedButton.icon(
                 onPressed: () => context.push('/password'),
                 icon: const Icon(Icons.lock_outline),
-                label: Text(ar ? 'تغيير الرمز (PIN)' : 'Change PIN'),
+                label: Text(ar ? 'تغيير الرمز السري (PIN)' : 'Change PIN'),
               ),
               const SizedBox(height: AppSpacing.sm),
               OutlinedButton.icon(
                 onPressed: () => context.read<AppCubit>().logout(),
                 icon: const Icon(Icons.logout),
-                label: Text(ar ? 'تسجيل خروج' : 'Log out'),
+                label: Text(ar ? 'تسجيل الخروج' : 'Log out'),
               ),
             ],
           ),

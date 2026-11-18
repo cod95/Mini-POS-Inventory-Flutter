@@ -45,7 +45,7 @@ class BluetoothPrinterService {
       'customer': 'الزبون',
       'noName': 'بدون اسم',
       'totalUsd': 'المجموع بالدولار',
-      'totalLbp': 'المجموع باللبناني',
+      'totalLbp': 'المجموع بالليرة اللبنانية',
       'totalAfterTax': 'المجموع بعد TVA',
       'itemCount': 'عدد الأصناف',
       'title': 'تقرير الفترة',

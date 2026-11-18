@@ -55,7 +55,7 @@ class _LoginPageState extends State<LoginPage> {
       final seconds = int.tryParse(error.substring(7)) ?? 60;
       final minutes = (seconds / 60).ceil();
       return ar
-          ? 'الحساب مقفول مؤقتاً بسبب محاولات غلط. جرّب بعد $minutes دقيقة.'
+          ? 'الحساب مقفل مؤقتاً بسبب محاولات خاطئة. أعد المحاولة بعد $minutes دقيقة.'
           : 'Account temporarily locked after wrong attempts. Try again in $minutes min.';
     }
     return invalid;
@@ -116,7 +116,7 @@ class _LoginPageState extends State<LoginPage> {
                                   (u) => DropdownMenuItem(
                                     value: u.id,
                                     child: Text(
-                                      '${u.name}  (${u.role == UserRole.admin ? (l10n.isArabic ? 'أدمن' : 'Admin') : (l10n.isArabic ? 'كاشير' : 'Cashier')})',
+                                      '${u.name}  (${u.role == UserRole.admin ? (l10n.isArabic ? 'مدير' : 'Admin') : (l10n.isArabic ? 'أمين صندوق' : 'Cashier')})',
                                     ),
                                   ),
                                 )
@@ -130,8 +130,8 @@ class _LoginPageState extends State<LoginPage> {
                           AppTextField(
                             controller: _passwordController,
                             label: _selectedUser?.role == UserRole.cashier
-                                ? (l10n.isArabic ? 'الرمز (PIN)' : 'PIN')
-                                : (l10n.isArabic ? 'كلمة السر' : 'Password'),
+                                ? (l10n.isArabic ? 'الرمز السري (PIN)' : 'PIN')
+                                : (l10n.isArabic ? 'كلمة المرور' : 'Password'),
                             obscureText: true,
                           ),
                           const SizedBox(height: AppSpacing.lg),

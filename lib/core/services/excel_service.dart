@@ -77,14 +77,14 @@ class ExcelService {
     final help = excel['Instructions / تعليمات'];
     final lines = <String>[
       'HOW TO FILL / طريقة التعبئة',
-      '1) Fill the "Products" sheet, one product per row, starting at row 2. / عبّي صفحة Products، منتج بكل سطر، من السطر 2.',
+      '1) Fill the "Products" sheet, one product per row, starting at row 2. / املأ صفحة Products، منتجاً في كل سطر، ابتداءً من السطر 2.',
       '2) Only Name is required. / الاسم هو الحقل الوحيد المطلوب.',
       '3) Cost and Price are in $currency. / التكلفة والسعر بعملة $currency.',
-      '4) Stock = quantity you have now (whole number). / الكمية = الموجود حالياً (رقم صحيح).',
+      '4) Stock = quantity you have now (whole number). / الكمية = الموجود حالياً (عدد صحيح).',
       '5) TVA: write yes or no (نعم / لا). / الضريبة: اكتب نعم أو لا.',
-      '6) Category is created automatically if it does not exist. / القسم بينعمل لحاله إذا مش موجود.',
-      '7) If SKU / Barcode / Name matches an existing product it is UPDATED, otherwise a new product is created. / إذا الرمز أو الباركود أو الاسم مطابق لمنتج موجود بيتعدّل، وإلا بينضاف جديد.',
-      '8) Do not change the column order or delete the header row. / لا تغيّر ترتيب الأعمدة ولا تمسح سطر العناوين.',
+      '6) Category is created automatically if it does not exist. / يُنشأ القسم تلقائياً إن لم يكن موجوداً.',
+      '7) If SKU / Barcode / Name matches an existing product it is UPDATED, otherwise a new product is created. / إذا طابق الرمز أو الباركود أو الاسم منتجاً موجوداً فسيُعدَّل، وإلا فسيُضاف منتج جديد.',
+      '8) Do not change the column order or delete the header row. / لا تغيّر ترتيب الأعمدة ولا تحذف سطر العناوين.',
       '',
       'EXAMPLE / مثال:',
       'Coffee | COF-01 | 6221234567890 | Drinks | 0.5 | 1.5 | 40 | 5 | piece | no',
@@ -201,14 +201,14 @@ class ExcelService {
     } catch (_) {
       return const ProductSheetReadResult(
         rows: [],
-        errors: ['The file is not a valid .xlsx Excel file / الملف مش Excel صحيح (.xlsx)'],
+        errors: ['The file is not a valid .xlsx Excel file / الملف ليس ملف Excel صالحاً (.xlsx)'],
       );
     }
 
     final sheet = excel.tables[productsSheet] ??
         (excel.tables.values.isEmpty ? null : excel.tables.values.first);
     if (sheet == null) {
-      return const ProductSheetReadResult(rows: [], errors: ['No sheet found / ما في صفحة']);
+      return const ProductSheetReadResult(rows: [], errors: ['No sheet found / لا توجد صفحة']);
     }
 
     final rows = <ProductSheetRow>[];
@@ -233,7 +233,7 @@ class ExcelService {
       final isEmpty = List.generate(productHeaders.length, text).every((v) => v.isEmpty);
       if (isEmpty) continue;
       if (name.isEmpty) {
-        errors.add('Row ${i + 1}: name is empty — skipped / الاسم فاضي، انتخطى');
+        errors.add('Row ${i + 1}: name is empty — skipped / الاسم فارغ، تم تجاوز السطر');
         continue;
       }
 

@@ -85,7 +85,7 @@ class LocalAuthRepository implements AuthRepository {
         .getSingleOrNull();
     if (row == null) throw AppException('User not found');
     if (currentSecret != null && !await SecretHasher.verify(currentSecret.trim(), row.secret)) {
-      throw AppException('الكلمة الحالية غلط / Current password is wrong');
+      throw AppException('كلمة المرور الحالية غير صحيحة / Current password is wrong');
     }
     final clean = newSecret.trim();
     final problem = SecretPolicy.check(clean, isAdmin: row.role == UserRole.admin.value);

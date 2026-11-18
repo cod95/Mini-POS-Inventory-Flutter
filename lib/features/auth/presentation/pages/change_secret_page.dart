@@ -36,7 +36,7 @@ class _ChangeSecretPageState extends State<ChangeSecretPage> {
   Future<void> _save() async {
     final ar = context.l10n.isArabic;
     if (_new.text != _confirm.text) {
-      setState(() => _error = ar ? 'الكلمتين مش متطابقتين' : 'The two entries do not match');
+      setState(() => _error = ar ? 'الإدخالان غير متطابقين' : 'The two entries do not match');
       return;
     }
     setState(() {
@@ -61,7 +61,7 @@ class _ChangeSecretPageState extends State<ChangeSecretPage> {
       context.go('/pos');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ar ? 'تم تغيير كلمة السر' : 'Password changed')),
+        SnackBar(content: Text(ar ? 'تم تغيير كلمة المرور' : 'Password changed')),
       );
       context.pop();
     }
@@ -72,7 +72,7 @@ class _ChangeSecretPageState extends State<ChangeSecretPage> {
     final ar = context.l10n.isArabic;
     final role = context.read<AppCubit>().state.session?.role;
     final isAdmin = role == UserRole.admin;
-    final what = isAdmin ? (ar ? 'كلمة السر' : 'password') : (ar ? 'الرمز (PIN)' : 'PIN');
+    final what = isAdmin ? (ar ? 'كلمة المرور' : 'password') : (ar ? 'الرمز السري (PIN)' : 'PIN');
 
     return PopScope(
       canPop: !widget.forced,
@@ -102,7 +102,7 @@ class _ChangeSecretPageState extends State<ChangeSecretPage> {
                       padding: const EdgeInsets.all(AppSpacing.md),
                       child: Text(
                         ar
-                            ? 'هالحساب لسا عم يستعمل $what الافتراضي. لأمان المحل لازم تختار واحد جديد قبل ما تكمّل.'
+                            ? 'ما زال هذا الحساب يستخدم $what الافتراضي. حفاظاً على أمان المحل يجب اختيار بديل جديد قبل المتابعة.'
                             : 'This account still uses the default $what. For your shop\'s safety choose a new one before continuing.',
                       ),
                     ),
@@ -130,7 +130,7 @@ class _ChangeSecretPageState extends State<ChangeSecretPage> {
                 TextField(
                   controller: _confirm,
                   obscureText: true,
-                  decoration: InputDecoration(labelText: ar ? 'أعد كتابته' : 'Repeat it'),
+                  decoration: InputDecoration(labelText: ar ? 'أعد إدخاله' : 'Repeat it'),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: AppSpacing.md),

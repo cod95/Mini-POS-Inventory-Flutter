@@ -63,30 +63,30 @@ class _SyncPageState extends State<SyncPage> {
     switch (st.state) {
       case 'off':
         return ar
-            ? 'متوقفة. حط رمز المحل وفعّل المزامنة التلقائية.'
+            ? 'متوقفة. أدخل رمز المحل وفعّل المزامنة التلقائية.'
             : 'Off. Set the shop code and turn automatic sync on.';
       case 'searching':
-        return ar ? 'عم دوّر على تلفون الأدمن على نفس الشبكة…' : 'Looking for the admin phone on this network…';
+        return ar ? 'جارٍ البحث عن هاتف المدير على الشبكة نفسها…' : 'Looking for the admin phone on this network…';
       case 'syncing':
-        return ar ? 'عم تزامن…' : 'Syncing…';
+        return ar ? 'جارٍ المزامنة…' : 'Syncing…';
       case 'connected':
         if (_isMain) {
-          return ar ? 'جاهز. التلفونات التانية بتتصل لحالها.' : 'Ready. The other phones connect by themselves.';
+          return ar ? 'جاهز. تتصل الهواتف الأخرى تلقائياً.' : 'Ready. The other phones connect by themselves.';
         }
-        return ar ? 'متصل بـ ${st.peerName ?? 'الأدمن'}' : 'Connected to ${st.peerName ?? 'admin'}';
+        return ar ? 'متصل بـ ${st.peerName ?? 'المدير'}' : 'Connected to ${st.peerName ?? 'admin'}';
       default:
         switch (st.error) {
           case 'UNREACHABLE':
             return ar
-                ? 'ما قدرت اتصل بتلفون الأدمن. تأكد إن التطبيق مفتوح عندو وإنكن على نفس الواي فاي.'
+                ? 'تعذّر الاتصال بهاتف المدير. تأكد أن التطبيق مفتوح عنده وأن الهاتفين على شبكة الواي فاي نفسها.'
                 : 'Cannot reach the admin phone. Make sure the app is open there and both are on the same Wi-Fi.';
           case 'WRONG_CODE':
-            return ar ? 'رمز المحل مختلف بين التلفونين.' : 'The shop code differs between the two phones.';
+            return ar ? 'رمز المحل مختلف بين الهاتفين.' : 'The shop code differs between the two phones.';
           case 'CLOCK':
-            return ar ? 'وقت التلفونين مختلف كتير، صحّح الساعة.' : 'The phones\' clocks differ too much. Fix the time.';
+            return ar ? 'وقت الهاتفين مختلف كثيراً، يرجى ضبط الساعة.' : 'The phones\' clocks differ too much. Fix the time.';
           case 'two-main':
             return ar
-                ? 'في أكتر من تلفون "رئيسي" على الشبكة. الرمز بينعمل على تلفون الأدمن بس.'
+                ? 'يوجد أكثر من هاتف «رئيسي» على الشبكة. يجب إنشاء الرمز على هاتف المدير فقط.'
                 : 'More than one main phone is on the network. Only the admin phone should create the code.';
           default:
             return st.error ?? '';
@@ -117,14 +117,14 @@ class _SyncPageState extends State<SyncPage> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(_ar ? 'عنوان تلفون الأدمن' : 'Admin phone address'),
+        title: Text(_ar ? 'عنوان هاتف المدير' : 'Admin phone address'),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             hintText: '192.168.1.20',
             helperText: _ar
-                ? 'بس إذا ما لقاه لحالو. بيظهر على تلفون الأدمن بنفس هالشاشة.'
+                ? 'استخدمه فقط إذا لم يُعثر عليه تلقائياً. يظهر على هاتف المدير في هذه الشاشة نفسها.'
                 : 'Only if it is not found by itself. Shown on the admin phone in this screen.',
           ),
         ),
@@ -180,10 +180,10 @@ class _SyncPageState extends State<SyncPage> {
                 ),
                 Text(
                   _code == null
-                      ? (ar ? 'حط رمز المحل أول شي.' : 'Set the shop code first.')
+                      ? (ar ? 'أدخل رمز المحل أولاً.' : 'Set the shop code first.')
                       : (_isMain
-                          ? (ar ? 'هيدا تلفون الأدمن (الرئيسي).' : 'This is the admin (main) phone.')
-                          : (ar ? 'هيدا تلفون موظف.' : 'This is an employee phone.')),
+                          ? (ar ? 'هذا هو هاتف المدير (الرئيسي).' : 'This is the admin (main) phone.')
+                          : (ar ? 'هذا هاتف موظف.' : 'This is an employee phone.')),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: AppSpacing.xs),
@@ -203,14 +203,14 @@ class _SyncPageState extends State<SyncPage> {
                 if (_isMain && _addresses.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    ar ? 'عنوان هالتلفون: ${_addresses.join('  ،  ')}' : 'This phone\'s address: ${_addresses.join(', ')}',
+                    ar ? 'عنوان هذا الهاتف: ${_addresses.join('  ،  ')}' : 'This phone\'s address: ${_addresses.join(', ')}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   ar
-                      ? 'بتشتغل والتطبيق مفتوح على التلفونين وعلى نفس الشبكة. المبيعات بتروح للأدمن، والأسعار والمنتجات والمستخدمين بتوصل للموظف.'
+                      ? 'تعمل والتطبيق مفتوح على الهاتفين وهما على الشبكة نفسها. تنتقل المبيعات إلى المدير، وتصل الأسعار والمنتجات والمستخدمون إلى الموظف.'
                       : 'Works while the app is open on both phones and they share a network. Sales go to the admin; prices, products and users come back.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
@@ -222,7 +222,7 @@ class _SyncPageState extends State<SyncPage> {
                       FilledButton.icon(
                         onPressed: _busy ? null : _syncNow,
                         icon: const Icon(Icons.sync),
-                        label: Text(ar ? 'زامن هلأ' : 'Sync now'),
+                        label: Text(ar ? 'زامن الآن' : 'Sync now'),
                       ),
                       OutlinedButton(
                         onPressed: _editHubAddress,
@@ -251,7 +251,7 @@ class _SyncPageState extends State<SyncPage> {
         builder: (ctx) => AlertDialog(
           title: Text(_ar ? 'رمز جديد؟' : 'New code?'),
           content: Text(_ar
-              ? 'الأجهزة التانية لازم تدخل الرمز الجديد، وإلا ما رح تقدر تقرا ملفاتك.'
+              ? 'يجب إدخال الرمز الجديد في الأجهزة الأخرى، وإلا لن تتمكن من قراءة ملفاتك.'
               : 'The other phones must enter the new code, otherwise they cannot read your files.'),
           actions: [
             TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(_ar ? 'إلغاء' : 'Cancel')),
@@ -282,7 +282,7 @@ class _SyncPageState extends State<SyncPage> {
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
                   hintText: 'XXXX-XXXX-XXXX',
-                  helperText: _ar ? 'الرمز الظاهر عند الأدمن بشاشة المزامنة' : 'Shown on the admin phone in this screen',
+                  helperText: _ar ? 'الرمز الظاهر على هاتف المدير في شاشة المزامنة' : 'Shown on the admin phone in this screen',
                   errorText: error,
                 ),
               ),
@@ -313,13 +313,13 @@ class _SyncPageState extends State<SyncPage> {
     if (e is FormatException) {
       switch (e.message) {
         case 'NO_SYNC_CODE':
-          return _ar ? 'حط رمز المحل أول شي.' : 'Set the shop code first.';
+          return _ar ? 'أدخل رمز المحل أولاً.' : 'Set the shop code first.';
         case 'WRONG_CODE':
           return _ar
-              ? 'رمز المحل مختلف أو الملف تالف. تأكد إن الجهازين عندن نفس الرمز.'
+              ? 'رمز المحل مختلف أو الملف تالف. تأكد من أن الجهازين يستخدمان الرمز نفسه.'
               : 'Different shop code or damaged file. Make sure both phones use the same code.';
         case 'NOT_A_SYNC_FILE':
-          return _ar ? 'هاد الملف مش ملف مزامنة صحيح.' : 'This is not a valid sync file.';
+          return _ar ? 'هذا الملف ليس ملف مزامنة صالحاً.' : 'This is not a valid sync file.';
       }
     }
     return e.toString();
@@ -390,7 +390,7 @@ class _SyncPageState extends State<SyncPage> {
       if (r.settingsApplied) (ar ? 'تم تحديث إعدادات المحل' : 'Store settings updated'),
       if (r.assignedDeviceCode != null)
         (ar
-            ? 'رمز هالجهاز صار: ${r.assignedDeviceCode} (بيظهر بأرقام فواتيره)'
+            ? 'أصبح رمز هذا الجهاز: ${r.assignedDeviceCode} (يظهر في أرقام فواتيره)'
             : 'This device code is now ${r.assignedDeviceCode} (shown in its invoice numbers)'),
     ];
     return showDialog<void>(
@@ -412,7 +412,7 @@ class _SyncPageState extends State<SyncPage> {
           ),
         ),
         actions: [
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(ar ? 'تمام' : 'OK')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(ar ? 'حسناً' : 'OK')),
         ],
       ),
     );
@@ -461,14 +461,14 @@ class _SyncPageState extends State<SyncPage> {
                   else
                     Text(
                       ar
-                          ? 'لسا ما في رمز. على تلفون الأدمن اضغط "إنشاء رمز"، وعلى باقي التلفونات "إدخال الرمز".'
+                          ? 'لا يوجد رمز بعد. على هاتف المدير اضغط «إنشاء رمز»، وعلى بقية الهواتف «إدخال الرمز».'
                           : 'No code yet. On the admin phone tap "Create code", on the other phones "Enter code".',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     ar
-                        ? 'كل ملفات المزامنة بتتشفّر بهالرمز. نفس الرمز لازم يكون عند كل تلفونات المحل.'
+                        ? 'تُشفَّر جميع ملفات المزامنة بهذا الرمز، ويجب أن يكون الرمز نفسه في جميع هواتف المحل.'
                         : 'Every sync file is encrypted with this code. All phones of the shop must use the same one.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -495,14 +495,14 @@ class _SyncPageState extends State<SyncPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(ar ? 'كيف بتشتغل' : 'How it works', style: Theme.of(context).textTheme.titleMedium),
+                  Text(ar ? 'طريقة العمل' : 'How it works', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     ar
-                        ? '1) على تلفون الموظف: حسابو > "إرسال المبيعات" (أو من هون إذا دخلت كأدمن). بيطلع ملف، ابعتو واتساب لتلفونك.\n'
-                            '2) على تلفونك (الأدمن): اضغط "استلام مزامنة" واختار الملف. المبيعات والمرتجعات بتنضم، والمخزون بيتعدل.\n'
-                            '3) بالعكس: اضغط "إرسال مزامنة" عندك وابعت الملف لتلفون الموظف، بيستلمو الأدمن عندو. هيك بيوصل الموظف الأسعار والمنتجات الجديدة والمستخدمين.\n'
-                            'استلام نفس الملف مرتين ما بيكرّر شي.'
+                        ? '1) على هاتف الموظف: شاشة المزامنة ← «إرسال مزامنة». يظهر ملف، أرسله عبر واتساب إلى هاتفك.\n'
+                            '2) على هاتفك (المدير): اضغط «استلام مزامنة» واختر الملف. تُضاف المبيعات والمرتجعات ويُحدَّث المخزون.\n'
+                            '3) بالعكس: اضغط «إرسال مزامنة» عندك وأرسل الملف إلى هاتف الموظف ليستلمه هناك، فتصله الأسعار والمنتجات الجديدة والمستخدمون.\n'
+                            'استلام الملف نفسه مرتين لا يكرر أي شيء.'
                         : '1) On the employee phone: Account > "Send sales" (or from here as admin). Send the file to your phone.\n'
                             '2) On your phone (admin): tap "Receive sync" and pick the file. Sales and returns are merged and stock is updated.\n'
                             '3) The other way: tap "Send sync" on your phone and import it on the employee phone as admin. That sends prices, new products and users.\n'

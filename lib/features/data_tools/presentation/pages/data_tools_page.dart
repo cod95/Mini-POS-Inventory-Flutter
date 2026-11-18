@@ -66,7 +66,7 @@ class _DataToolsPageState extends State<DataToolsPage> {
         final file = await _excel.buildProductsTemplate(currency: _settings.currency);
         await _excel.share(file);
         _info(_ar
-            ? 'تم تجهيز النموذج. احفظه أو ابعته لحالك، عبّيه وارجع استورده.'
+            ? 'تم تجهيز النموذج. احفظه أو أرسله إلى نفسك، ثم املأه وأعد استيراده.'
             : 'Template ready. Save it, fill it and import it back.');
       });
 
@@ -89,7 +89,7 @@ class _DataToolsPageState extends State<DataToolsPage> {
       context: context,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)),
-      helpText: _ar ? 'اختار الفترة (أو ارجع لتصدير الكل)' : 'Pick a period (or go back to export all)',
+      helpText: _ar ? 'اختر الفترة (أو ارجع لتصدير الكل)' : 'Pick a period (or go back to export all)',
     );
     if (!mounted) return;
 
@@ -205,7 +205,7 @@ class _DataToolsPageState extends State<DataToolsPage> {
       if (!mounted) return;
       await _showImportResult(created: created, updated: updated, errors: errors);
       _info(_ar
-          ? 'الاستيراد خلص: $created جديد، $updated معدّل، ${errors.length} مشكلة.'
+          ? 'اكتمل الاستيراد: $created جديد، $updated معدّل، ${errors.length} مشكلة.'
           : 'Import done: $created new, $updated updated, ${errors.length} problems.');
     });
   }
@@ -239,7 +239,7 @@ class _DataToolsPageState extends State<DataToolsPage> {
                         ),
                       ),
                   if (errors.length > 20)
-                    Text(ar ? '… و${errors.length - 20} غيرها' : '… and ${errors.length - 20} more'),
+                    Text(ar ? '… و${errors.length - 20} أخرى' : '… and ${errors.length - 20} more'),
                 ],
               ],
             ),
@@ -248,7 +248,7 @@ class _DataToolsPageState extends State<DataToolsPage> {
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(ar ? 'تمام' : 'OK'),
+            child: Text(ar ? 'حسناً' : 'OK'),
           ),
         ],
       ),
@@ -280,7 +280,7 @@ class _DataToolsPageState extends State<DataToolsPage> {
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     ar
-                        ? 'نزّل النموذج، عبّي المنتجات بالإكسل، وبعدين استورده. المنتج الموجود (نفس الرمز أو الباركود أو الاسم) بيتعدّل، والجديد بينضاف. التكلفة والسعر بعملة المحل (${_settings.currency}).'
+                        ? 'نزّل النموذج واملأ المنتجات في Excel ثم استورده. يُعدَّل المنتج الموجود (بالرمز أو الباركود أو الاسم نفسه) ويُضاف الجديد. التكلفة والسعر بعملة المحل (${_settings.currency}).'
                         : 'Download the template, fill in your products in Excel, then import it. An existing product (same SKU, barcode or name) is updated, a new one is added. Cost and price are in the store currency (${_settings.currency}).',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -288,7 +288,7 @@ class _DataToolsPageState extends State<DataToolsPage> {
                   FilledButton.icon(
                     onPressed: _busy ? null : _downloadTemplate,
                     icon: const Icon(Icons.download),
-                    label: Text(ar ? 'تحميل نموذج Excel فاضي' : 'Download blank Excel template'),
+                    label: Text(ar ? 'تحميل نموذج Excel فارغ' : 'Download blank Excel template'),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   OutlinedButton.icon(
@@ -320,7 +320,7 @@ class _DataToolsPageState extends State<DataToolsPage> {
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     ar
-                        ? 'ملف إكسل فيه الفواتير (صفحة) وتفاصيل الأصناف (صفحة تانية) مع المرتجعات.'
+                        ? 'ملف Excel يحتوي الفواتير في صفحة وتفاصيل الأصناف في صفحة ثانية مع المرتجعات.'
                         : 'An Excel file with the invoices (one sheet) and every item line (another sheet), returns included.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),

@@ -165,7 +165,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                 : _error != null
                     ? EmptyState(message: _error!)
                     : rows.isEmpty
-                        ? EmptyState(message: ar ? 'ما في فواتير' : 'No invoices')
+                        ? EmptyState(message: ar ? 'لا توجد فواتير' : 'No invoices')
                         : RefreshIndicator(
                             onRefresh: _load,
                             child: ListView.separated(

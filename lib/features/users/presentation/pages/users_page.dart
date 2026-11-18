@@ -73,25 +73,25 @@ class _UsersPageState extends State<UsersPage> {
                   obscureText: true,
                   decoration: InputDecoration(
                     labelText: role == UserRole.admin
-                        ? (ar ? 'كلمة السر' : 'Password')
-                        : (ar ? 'الرمز (PIN)' : 'PIN'),
+                        ? (ar ? 'كلمة المرور' : 'Password')
+                        : (ar ? 'الرمز السري (PIN)' : 'PIN'),
                     helperText: user == null
                         ? null
-                        : (ar ? 'اتركها فاضية إذا ما بدك تغيّرها' : 'Leave empty to keep the current one'),
+                        : (ar ? 'اتركه فارغاً للإبقاء على الحالي' : 'Leave empty to keep the current one'),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 SegmentedButton<UserRole>(
                   segments: [
-                    ButtonSegment(value: UserRole.cashier, label: Text(ar ? 'كاشير' : 'Cashier')),
-                    ButtonSegment(value: UserRole.admin, label: Text(ar ? 'أدمن' : 'Admin')),
+                    ButtonSegment(value: UserRole.cashier, label: Text(ar ? 'أمين صندوق' : 'Cashier')),
+                    ButtonSegment(value: UserRole.admin, label: Text(ar ? 'مدير' : 'Admin')),
                   ],
                   selected: {role},
                   onSelectionChanged: (value) => setLocal(() => role = value.first),
                 ),
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(ar ? 'فعّال' : 'Active'),
+                  title: Text(ar ? 'مفعّل' : 'Active'),
                   value: active,
                   onChanged: (value) => setLocal(() => active = value),
                 ),
@@ -135,7 +135,7 @@ class _UsersPageState extends State<UsersPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(ar ? 'حذف المستخدم' : 'Delete user'),
-        content: Text(ar ? 'حذف "${user.name}"؟ فواتيره القديمة بتضل محفوظة.' : 'Delete "${user.name}"? His old invoices stay.'),
+        content: Text(ar ? 'حذف "${user.name}"؟ تبقى فواتيره السابقة محفوظة.' : 'Delete "${user.name}"? His old invoices stay.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(ar ? 'إلغاء' : 'Cancel')),
           FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(ar ? 'حذف' : 'Delete')),
@@ -157,7 +157,7 @@ class _UsersPageState extends State<UsersPage> {
     final currentUserId = context.watch<AppCubit>().state.session?.userId;
 
     return Scaffold(
-      appBar: AppBar(title: Text(ar ? 'المستخدمين' : 'Users')),
+      appBar: AppBar(title: Text(ar ? 'المستخدمون' : 'Users')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(),
         icon: const Icon(Icons.person_add),
@@ -170,7 +170,7 @@ class _UsersPageState extends State<UsersPage> {
               children: [
                 Text(
                   ar
-                      ? 'الأدمن بيشوف كل شي. الكاشير بيشوف البيع والفواتير (إرسال وطباعة) بس.'
+                      ? 'يرى المدير كل شيء. أما أمين الصندوق فيرى البيع والفواتير (إرسال وطباعة) فقط.'
                       : 'Admins see everything. Cashiers only sell and send/print invoices.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
@@ -181,7 +181,7 @@ class _UsersPageState extends State<UsersPage> {
                       leading: Icon(user.role == UserRole.admin ? Icons.admin_panel_settings : Icons.point_of_sale),
                       title: Text(user.name + (user.id == currentUserId ? (ar ? '  (أنت)' : '  (you)') : '')),
                       subtitle: Text(
-                        '${user.role == UserRole.admin ? (ar ? 'أدمن' : 'Admin') : (ar ? 'كاشير' : 'Cashier')}'
+                        '${user.role == UserRole.admin ? (ar ? 'مدير' : 'Admin') : (ar ? 'أمين صندوق' : 'Cashier')}'
                         '${user.active ? '' : (ar ? ' • موقوف' : ' • disabled')}',
                       ),
                       onTap: () => _edit(user),

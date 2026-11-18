@@ -214,7 +214,7 @@ class _ProductsView extends StatelessWidget {
                       if (state.categories.isEmpty)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-                          child: Text('لا يوجد أقسام بعد'),
+                          child: Text('لا توجد أقسام بعد'),
                         )
                       else
                         ...state.categories.map(

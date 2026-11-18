@@ -50,7 +50,7 @@ class _InvoiceDetailView extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(ar ? 'تراجع' : 'Back'),
+            child: Text(ar ? 'رجوع' : 'Back'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -124,7 +124,7 @@ class _InvoiceDetailView extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
               Text('${l10n.tr('customerName')}: $customerLabel'),
               if ((sale.cashierName ?? '').isNotEmpty)
-                Text('${ar ? 'الكاشير' : 'Cashier'}: ${sale.cashierName}'),
+                Text('${ar ? 'أمين الصندوق' : 'Cashier'}: ${sale.cashierName}'),
               const SizedBox(height: AppSpacing.md),
               Card(
                 child: Padding(
@@ -306,7 +306,7 @@ class _InvoiceDetailView extends StatelessWidget {
                             context,
                             title: ar ? 'تأكيد المرتجع' : 'Confirm return',
                             message: ar
-                                ? 'رح ترجع الأصناف المحددة للمخزون وتنخصم من المبيعات والأرباح.'
+                                ? 'ستُعاد الأصناف المحددة إلى المخزون وتُخصم من المبيعات والأرباح.'
                                 : 'The selected items go back to stock and are deducted from sales and profit.',
                             confirmLabel: ar ? 'تأكيد' : 'Confirm',
                           );
@@ -330,7 +330,7 @@ class _InvoiceDetailView extends StatelessWidget {
                             context,
                             title: ar ? 'إلغاء الفاتورة' : 'Cancel invoice',
                             message: ar
-                                ? 'رح تنلغي الفاتورة كاملة وترجع كل الأصناف للمخزون وما تنحسب بالتقارير.'
+                                ? 'ستُلغى الفاتورة كاملةً وتُعاد جميع الأصناف إلى المخزون ولن تُحتسب في التقارير.'
                                 : 'The whole invoice is voided, all items go back to stock and it no longer counts in reports.',
                             confirmLabel: ar ? 'إلغاء الفاتورة' : 'Cancel invoice',
                           );
@@ -343,7 +343,7 @@ class _InvoiceDetailView extends StatelessWidget {
               if (!isAdmin && !isReturnDoc && state.isReturnable) ...[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  ar ? 'المرتجع والإلغاء من صلاحية الأدمن.' : 'Returns and cancellation need an admin.',
+                  ar ? 'المرتجع والإلغاء من صلاحية المدير فقط.' : 'Returns and cancellation need an admin.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -357,7 +357,7 @@ class _InvoiceDetailView extends StatelessWidget {
               if (state.info == 'cancelled') ...[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  ar ? 'تم إلغاء الفاتورة وإرجاع المخزون.' : 'Invoice cancelled and stock restored.',
+                  ar ? 'تم إلغاء الفاتورة وإعادة المخزون.' : 'Invoice cancelled and stock restored.',
                   style: TextStyle(color: Theme.of(context).colorScheme.primary),
                 ),
               ],

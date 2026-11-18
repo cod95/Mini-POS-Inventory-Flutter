@@ -31,11 +31,11 @@ class _BackupPageState extends State<BackupPage> {
     if (e is BackupException) {
       switch (e.code) {
         case 'SHORT_PASSWORD':
-          return ar ? 'كلمة السر 6 خانات على الأقل.' : 'Password needs at least 6 characters.';
+          return ar ? 'كلمة المرور 6 خانات على الأقل.' : 'Password needs at least 6 characters.';
         case 'WRONG_PASSWORD':
-          return ar ? 'كلمة السر غلط أو الملف تالف.' : 'Wrong password or damaged file.';
+          return ar ? 'كلمة المرور غير صحيحة أو الملف تالف.' : 'Wrong password or damaged file.';
         case 'NOT_A_BACKUP':
-          return ar ? 'هاد مش ملف نسخة احتياطية صحيح.' : 'This is not a valid backup file.';
+          return ar ? 'هذا ليس ملف نسخة احتياطية صالحاً.' : 'This is not a valid backup file.';
       }
     }
     return e.toString();
@@ -50,27 +50,27 @@ class _BackupPageState extends State<BackupPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: Text(ar ? 'كلمة سر النسخة' : 'Backup password'),
+          title: Text(ar ? 'كلمة مرور النسخة' : 'Backup password'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: first,
                 obscureText: true,
-                decoration: InputDecoration(labelText: ar ? 'كلمة السر' : 'Password'),
+                decoration: InputDecoration(labelText: ar ? 'كلمة المرور' : 'Password'),
               ),
               if (confirm)
                 TextField(
                   controller: second,
                   obscureText: true,
-                  decoration: InputDecoration(labelText: ar ? 'أعد كتابتها' : 'Repeat it'),
+                  decoration: InputDecoration(labelText: ar ? 'أعد إدخالها' : 'Repeat it'),
                 ),
               if (confirm)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.sm),
                   child: Text(
                     ar
-                        ? 'احفظها منيح. بدونها ما بتقدر تسترجع النسخة.'
+                        ? 'احتفظ بها جيداً. بدونها لا يمكن استرجاع النسخة.'
                         : 'Keep it safe. Without it the backup cannot be restored.',
                     style: Theme.of(ctx).textTheme.bodySmall,
                   ),
@@ -87,12 +87,12 @@ class _BackupPageState extends State<BackupPage> {
                   return;
                 }
                 if (confirm && first.text != second.text) {
-                  setLocal(() => error = ar ? 'مش متطابقتين' : 'They do not match');
+                  setLocal(() => error = ar ? 'غير متطابقتين' : 'They do not match');
                   return;
                 }
                 Navigator.of(ctx).pop(first.text);
               },
-              child: Text(ar ? 'تابع' : 'Continue'),
+              child: Text(ar ? 'متابعة' : 'Continue'),
             ),
           ],
         ),
@@ -140,11 +140,11 @@ class _BackupPageState extends State<BackupPage> {
       builder: (ctx) => AlertDialog(
         title: Text(ar ? 'استرجاع النسخة؟' : 'Restore backup?'),
         content: Text(ar
-            ? 'كل البيانات الحالية بتنستبدل ببيانات النسخة. بيتم الاسترجاع عند فتح التطبيق من جديد.'
+            ? 'ستُستبدل جميع البيانات الحالية ببيانات النسخة، ويتم الاسترجاع عند إعادة فتح التطبيق.'
             : 'All current data is replaced by the backup. The restore happens when the app is opened again.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(ar ? 'إلغاء' : 'Cancel')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(ar ? 'استرجع' : 'Restore')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(ar ? 'استرجاع' : 'Restore')),
         ],
       ),
     );
@@ -159,7 +159,7 @@ class _BackupPageState extends State<BackupPage> {
         _isError = false;
         _restoreStaged = true;
         _message = ar
-            ? 'تمام. سكّر التطبيق وافتحو من جديد لإتمام الاسترجاع.'
+            ? 'تم. أغلق التطبيق ثم افتحه من جديد لإتمام الاسترجاع.'
             : 'Done. Close the app and open it again to finish the restore.';
       });
     } catch (e) {
@@ -191,10 +191,10 @@ class _BackupPageState extends State<BackupPage> {
               subtitle: Text(
                 encrypted
                     ? (ar
-                        ? 'مفعّل (AES-256). ملف البيانات ما بينقرا بدون مفتاح هالتلفون.'
+                        ? 'مفعّل (AES-256). لا يمكن قراءة ملف البيانات دون مفتاح هذا الهاتف.'
                         : 'Active (AES-256). The data file cannot be read without this phone\'s key.')
                     : (ar
-                        ? 'مش مفعّل على هالتلفون. عمل نسخة احتياطية بشكل دوري.'
+                        ? 'غير مفعّل على هذا الهاتف. احرص على أخذ نسخة احتياطية بشكل دوري.'
                         : 'Not active on this phone. Make backups regularly.'),
               ),
             ),
@@ -210,7 +210,7 @@ class _BackupPageState extends State<BackupPage> {
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     ar
-                        ? 'ملف واحد فيه كل المنتجات والفواتير والمستخدمين والإعدادات، محمي بكلمة سر. ابعتو لحالك (واتساب، إيميل، فلاشة). بيرجع بيشتغل على أي تلفون.'
+                        ? 'ملف واحد يحوي جميع المنتجات والفواتير والمستخدمين والإعدادات، محميّ بكلمة مرور. أرسله إلى نفسك (واتساب، بريد إلكتروني، ذاكرة خارجية). ويمكن استرجاعه على أي هاتف.'
                         : 'One file with all products, invoices, users and settings, protected by a password. Send it to yourself (WhatsApp, email, USB). It restores on any phone.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -251,7 +251,7 @@ class _BackupPageState extends State<BackupPage> {
             const SizedBox(height: AppSpacing.md),
             FilledButton(
               onPressed: () => SystemNavigator.pop(),
-              child: Text(ar ? 'سكّر التطبيق هلأ' : 'Close the app now'),
+              child: Text(ar ? 'إغلاق التطبيق الآن' : 'Close the app now'),
             ),
           ],
         ],

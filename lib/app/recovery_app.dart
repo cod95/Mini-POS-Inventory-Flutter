@@ -47,7 +47,7 @@ class _RecoveryAppState extends State<RecoveryApp> {
       });
     } catch (e) {
       setState(() => _message = e is BackupException && e.code == 'WRONG_PASSWORD'
-          ? 'كلمة السر غلط أو الملف تالف.\nWrong password or damaged file.'
+          ? 'كلمة المرور غلط أو الملف تالف.\nWrong password or damaged file.'
           : 'هاد مش ملف نسخة صحيح.\nThis is not a valid backup file.');
     } finally {
       setState(() => _busy = false);

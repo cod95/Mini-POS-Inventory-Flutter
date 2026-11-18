@@ -78,13 +78,13 @@ class SecretPolicy {
   static String? check(String secret, {required bool isAdmin}) {
     final s = secret.trim();
     if (isAdmin && s.length < 6) {
-      return 'كلمة السر 6 خانات على الأقل / Password needs at least 6 characters';
+      return 'كلمة المرور 6 خانات على الأقل / Password needs at least 6 characters';
     }
     if (!isAdmin && s.length < 4) {
-      return 'الرمز 4 خانات على الأقل / PIN needs at least 4 characters';
+      return 'الرمز السري 4 خانات على الأقل / PIN needs at least 4 characters';
     }
     if (_weak.contains(s.toLowerCase())) {
-      return 'هاي كلمة سر ضعيفة ومعروفة، اختار غيرها / This secret is too common, choose another';
+      return 'هذه كلمة مرور ضعيفة ومعروفة، اختر غيرها / This secret is too common, choose another';
     }
     return null;
   }

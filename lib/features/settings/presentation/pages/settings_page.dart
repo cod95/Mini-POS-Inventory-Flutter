@@ -225,7 +225,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: Text(l10n.isArabic ? 'الحماية والنسخ الاحتياطي' : 'Protection & backup'),
                   subtitle: Text(
                     l10n.isArabic
-                        ? 'تشفير البيانات، نسخة احتياطية بكلمة سر، واسترجاع'
+                        ? 'تشفير البيانات، ونسخة احتياطية بكلمة مرور، والاسترجاع'
                         : 'Data encryption, password-protected backup and restore',
                   ),
                   trailing: const Icon(Icons.chevron_right),
@@ -236,7 +236,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.lock_outline),
-                  title: Text(l10n.isArabic ? 'تغيير كلمة السر' : 'Change my password'),
+                  title: Text(l10n.isArabic ? 'تغيير كلمة المرور' : 'Change my password'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/password'),
                 ),
@@ -245,10 +245,10 @@ class _SettingsPageState extends State<SettingsPage> {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.people_outline),
-                  title: Text(l10n.isArabic ? 'المستخدمين' : 'Users'),
+                  title: Text(l10n.isArabic ? 'المستخدمون' : 'Users'),
                   subtitle: Text(
                     l10n.isArabic
-                        ? 'أدمن وكاشير: إضافة وتعديل وكلمات السر'
+                        ? 'مدير وأمين صندوق: إضافة وتعديل وكلمات المرور'
                         : 'Admin and cashier accounts, passwords and PINs',
                   ),
                   trailing: const Icon(Icons.chevron_right),
@@ -262,7 +262,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: Text(l10n.isArabic ? 'المزامنة بين الأجهزة' : 'Device sync'),
                   subtitle: Text(
                     l10n.isArabic
-                        ? 'نقل المبيعات والمخزون بين تلفونك وتلفون الموظف'
+                        ? 'نقل المبيعات والمخزون بين هاتفك وهاتف الموظف'
                         : 'Move sales and stock between your phone and the employee phone',
                   ),
                   trailing: const Icon(Icons.chevron_right),
@@ -351,7 +351,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: Text(l10n.isArabic ? 'Excel: استيراد وتصدير' : 'Excel: import / export'),
                   subtitle: Text(
                     l10n.isArabic
-                        ? 'نموذج منتجات، تصدير المخزون والمبيعات، واستيراد'
+                        ? 'نموذج المنتجات، تصدير المخزون والمبيعات، والاستيراد'
                         : 'Products template, inventory & sales export, import',
                   ),
                   trailing: const Icon(Icons.chevron_right),
