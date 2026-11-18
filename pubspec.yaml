@@ -39,7 +39,9 @@ dependencies:
   go_router: ^17.1.0
   intl: ^0.20.2
   drift: ^2.21.0
-  sqlite3_flutter_libs: ^0.5.24
+  sqlite3: ^2.4.6
+  sqlcipher_flutter_libs: ^0.6.4
+  flutter_secure_storage: ^9.2.4
   path_provider: ^2.1.4
   path: ^1.9.0
   collection: ^1.19.0

@@ -7,6 +7,7 @@ import '../core/services/receipt_pdf_service.dart';
 import '../core/services/stub_services.dart';
 import '../core/state/app_cubit.dart';
 import '../data/local/db/app_database.dart';
+import '../data/backup/backup_service.dart';
 import '../data/sync/file_sync_service.dart';
 import '../data/sync/lan_sync_service.dart';
 import '../data/local/seed/seed_data.dart';
@@ -31,6 +32,7 @@ class AppDependencies {
     required this.bluetoothPrinterService,
     required this.fileSyncService,
     required this.lanSyncService,
+    required this.backupService,
     required this.appCubit,
   });
 
@@ -53,6 +55,7 @@ class AppDependencies {
 
   final FileSyncService fileSyncService;
   final LanSyncService lanSyncService;
+  final BackupService backupService;
 
   final AppCubit appCubit;
 
@@ -76,6 +79,7 @@ class AppDependencies {
     final syncService = FakeSyncService();
     final fileSyncService = FileSyncService(db);
     final lanSyncService = LanSyncService(db, fileSyncService);
+    final backupService = BackupService(db);
 
     final appCubit = AppCubit(
       authRepository: authRepository,
@@ -103,6 +107,7 @@ class AppDependencies {
       bluetoothPrinterService: bluetoothPrinterService,
       fileSyncService: fileSyncService,
       lanSyncService: lanSyncService,
+      backupService: backupService,
       appCubit: appCubit,
     );
   }

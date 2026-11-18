@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/app_models.dart';
 import '../../features/auth/presentation/pages/change_secret_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/backup/presentation/pages/backup_page.dart';
 import '../../features/data_tools/presentation/pages/data_tools_page.dart';
 import '../../features/invoices/presentation/pages/invoice_detail_page.dart';
 import '../../features/invoices/presentation/pages/invoices_page.dart';
@@ -126,6 +127,10 @@ class AppRouter {
                     GoRoute(
                       path: 'data',
                       builder: (context, state) => const DataToolsPage(),
+                    ),
+                    GoRoute(
+                      path: 'backup',
+                      builder: (context, state) => const BackupPage(),
                     ),
                   ],
                 ),

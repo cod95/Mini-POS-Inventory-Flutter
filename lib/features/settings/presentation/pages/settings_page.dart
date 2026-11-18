@@ -221,6 +221,20 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: AppSpacing.md),
               Card(
                 child: ListTile(
+                  leading: const Icon(Icons.shield_outlined),
+                  title: Text(l10n.isArabic ? 'الحماية والنسخ الاحتياطي' : 'Protection & backup'),
+                  subtitle: Text(
+                    l10n.isArabic
+                        ? 'تشفير البيانات، نسخة احتياطية بكلمة سر، واسترجاع'
+                        : 'Data encryption, password-protected backup and restore',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/settings/backup'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Card(
+                child: ListTile(
                   leading: const Icon(Icons.lock_outline),
                   title: Text(l10n.isArabic ? 'تغيير كلمة السر' : 'Change my password'),
                   trailing: const Icon(Icons.chevron_right),
