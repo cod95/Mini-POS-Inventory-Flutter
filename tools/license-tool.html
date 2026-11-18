@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>أداة التراخيص - QuickStock POS</title>
+<style>
+  :root { --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --brand:#006b5e; --bg:#f8fafc; --warn:#b45309; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family: "Segoe UI", Tahoma, Arial, sans-serif; line-height:1.7; }
+  main { max-width: 820px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 24px; }
+  section { background:#fff; border:1px solid var(--line); border-radius:16px; padding:20px; margin-bottom:20px; }
+  h2 { font-size: 18px; margin: 0 0 12px; color: var(--brand); }
+  label { display:block; font-weight:600; margin: 12px 0 4px; }
+  input[type=text], input[type=password], input[type=date], textarea {
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-size:15px; font-family:inherit; background:#fff;
+  }
+  textarea { min-height: 110px; direction:ltr; text-align:left; font-family: Consolas, monospace; font-size: 13px; }
+  .ltr { direction:ltr; text-align:left; font-family: Consolas, monospace; }
+  button { background:var(--brand); color:#fff; border:0; border-radius:10px; padding:10px 18px; font-size:15px; font-weight:700; cursor:pointer; margin-top:14px; }
+  button.secondary { background:#fff; color:var(--brand); border:1px solid var(--brand); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .warn { color: var(--warn); font-weight: 600; }
+  .out { margin-top: 12px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .row > div { flex:1 1 220px; }
+  .ok { color: var(--brand); font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <h1>أداة التراخيص</h1>
+  <p class="lead">تعمل بالكامل على جهازك دون اتصال بالإنترنت. لا يُرسَل أي شيء إلى أي خادم. افتحها بمتصفح Chrome.</p>
+
+  <section>
+    <h2>١) الإعداد الأولي (مرة واحدة فقط)</h2>
+    <p class="note">ينشئ مفتاحك الخاص (للتوقيع) ومفتاحك العام (يوضع في التطبيق) ويحسب بصمة كلمة المرور الخاصة بك كمطوّر.</p>
+    <label for="master">كلمة المرور الخاصة بالمطوّر (12 خانة على الأقل)</label>
+    <input id="master" type="password" autocomplete="off">
+    <label for="master2">أعد إدخالها</label>
+    <input id="master2" type="password" autocomplete="off">
+    <button id="gen">إنشاء المفاتيح</button>
+    <div class="out" id="setupOut"></div>
+  </section>
+
+  <section>
+    <h2>٢) إصدار ترخيص لجهاز</h2>
+    <label for="keyfile">ملف المفتاح الخاص (quickstock-private-key.json)</label>
+    <input id="keyfile" type="file" accept=".json,application/json">
+    <div class="row">
+      <div>
+        <label for="device">رقم الجهاز (يظهر على شاشة القفل)</label>
+        <input id="device" type="text" class="ltr" placeholder="QS-XXXX-XXXX-XXXX">
+      </div>
+      <div>
+        <label for="customer">اسم الزبون / المحل</label>
+        <input id="customer" type="text">
+      </div>
+      <div>
+        <label for="expiry">تاريخ الانتهاء (اتركه فارغاً لترخيص دائم)</label>
+        <input id="expiry" type="date">
+      </div>
+    </div>
+    <button id="sign">إصدار الترخيص</button>
+    <div class="out" id="signOut"></div>
+  </section>
+</main>
+
+<script>
+/* ---------- core (also loaded by the node test) ---------- */
+function toB64(bytes) { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s); }
+function toB64u(bytes) { return toB64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function fromB64u(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '=';
+  const raw = atob(s); const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out;
+}
+function toHex(bytes) { return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(''); }
+const enc = new TextEncoder();
+
+async function genKeys() {
+  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+  return { jwk, x: toHex(fromB64u(jwk.x)), y: toHex(fromB64u(jwk.y)) };
+}
+
+async function signToken(jwk, payload) {
+  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const bytes = enc.encode(JSON.stringify(payload));
+  const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, bytes));
+  return 'QS1.' + toB64u(bytes) + '.' + toB64u(sig);
+}
+
+async function masterVerifier(password, rounds = 200000) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const base = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: rounds }, base, 256));
+  return 'pbkdf2$' + rounds + '$' + toB64(salt) + '$' + toB64(bits);
+}
+
+/* ---------- page wiring ---------- */
+if (typeof document !== 'undefined') {
+  const $ = id => document.getElementById(id);
+  let privateJwk = null;
+
+  $('keyfile').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { privateJwk = JSON.parse(await f.text()); } catch (_) { privateJwk = null; alert('الملف غير صالح'); }
+  });
+
+  $('gen').addEventListener('click', async () => {
+    const out = $('setupOut');
+    const p1 = $('master').value, p2 = $('master2').value;
+    if (p1.length < 12) { out.innerHTML = '<p class="warn">كلمة المرور يجب ألا تقل عن 12 خانة.</p>'; return; }
+    if (p1 !== p2) { out.innerHTML = '<p class="warn">كلمتا المرور غير متطابقتين.</p>'; return; }
+    out.textContent = 'جارٍ الإنشاء…';
+    const keys = await genKeys();
+    const verifier = await masterVerifier(p1);
+    const blob = new Blob([JSON.stringify(keys.jwk, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const snippet =
+`  static const String publicKeyX = '${keys.x}';
+  static const String publicKeyY = '${keys.y}';
+  static const String masterVerifier = '${verifier}';`;
+    out.innerHTML =
+      '<p class="ok">تم الإنشاء.</p>' +
+      '<p><a download="quickstock-private-key.json" href="' + url + '"><b>حمّل ملف المفتاح الخاص</b></a> ' +
+      '<span class="warn">احفظه في مكان آمن ولا ترسله لأحد، ولا تفقده: بدونه لا يمكنك إصدار تراخيص.</span></p>' +
+      '<p>أرسل لي النص التالي (للمفتاح العام وبصمة كلمة المرور فقط، وهو غير سري):</p>' +
+      '<textarea readonly onclick="this.select()">' + snippet + '</textarea>';
+  });
+
+  $('sign').addEventListener('click', async () => {
+    const out = $('signOut');
+    if (!privateJwk) { out.innerHTML = '<p class="warn">اختر ملف المفتاح الخاص أولاً.</p>'; return; }
+    const device = $('device').value.trim().toUpperCase();
+    if (!/^QS-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(device)) {
+      out.innerHTML = '<p class="warn">رقم الجهاز غير صحيح. الشكل: QS-XXXX-XXXX-XXXX</p>'; return;
+    }
+    const expiry = $('expiry').value || null;
+    const payload = { v: 1, d: device, c: $('customer').value.trim(), e: expiry, i: new Date().toISOString().slice(0, 10) };
+    try {
+      const token = await signToken(privateJwk, payload);
+      out.innerHTML = '<p class="ok">الترخيص جاهز. انسخه وأرسله للزبون:</p><textarea readonly onclick="this.select()">' + token + '</textarea>';
+    } catch (e) {
+      out.innerHTML = '<p class="warn">تعذّر التوقيع: ' + e + '</p>';
+    }
+  });
+}
+</script>
+</body>
+</html>

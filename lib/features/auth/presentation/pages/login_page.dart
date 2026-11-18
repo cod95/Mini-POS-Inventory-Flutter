@@ -6,6 +6,7 @@ import '../../../../app/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/models/app_models.dart';
 import '../../../../domain/entities/app_entities.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/state/app_cubit.dart';
 import '../../../../core/widgets/buttons.dart';
@@ -59,6 +60,89 @@ class _LoginPageState extends State<LoginPage> {
           : 'Account temporarily locked after wrong attempts. Try again in $minutes min.';
     }
     return invalid;
+  }
+
+  /// Forgotten password: only the developer's master password can set a new
+  /// one for the selected account.
+  Future<void> _forgot() async {
+    final user = _selectedUser;
+    if (user == null) return;
+    final ar = context.l10n.isArabic;
+    final deps = AppScope.of(context);
+    final master = TextEditingController();
+    final fresh = TextEditingController();
+    String? error;
+    var done = false;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(ar ? 'استعادة الوصول' : 'Recover access'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  ar
+                      ? 'يتطلب هذا الإجراء كلمة مرور المطوّر. سيتم تعيين كلمة مرور جديدة للحساب «${user.name}».'
+                      : 'This needs the developer password. A new password will be set for "${user.name}".',
+                  style: Theme.of(ctx).textTheme.bodySmall,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: master,
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: ar ? 'كلمة مرور المطوّر' : 'Developer password'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: fresh,
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: ar ? 'كلمة المرور الجديدة' : 'New password'),
+                ),
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: Text(error!, style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(ar ? 'إلغاء' : 'Cancel')),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  final ok = await deps.licenseService.verifyMaster(master.text);
+                  if (!ok) {
+                    setLocal(() => error = ar ? 'كلمة مرور المطوّر غير صحيحة.' : 'Wrong developer password.');
+                    return;
+                  }
+                  await deps.authRepository.changeSecret(userId: user.id, newSecret: fresh.text);
+                  done = true;
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                } on LoginLockedException catch (e) {
+                  final minutes = (e.seconds / 60).ceil();
+                  setLocal(() => error = ar
+                      ? 'محاولات خاطئة كثيرة. أعد المحاولة بعد $minutes دقيقة.'
+                      : 'Too many attempts. Try again in $minutes min.');
+                } on AppException catch (e) {
+                  setLocal(() => error = e.message);
+                }
+              },
+              child: Text(ar ? 'تعيين' : 'Set'),
+            ),
+          ],
+        ),
+      ),
+    );
+    master.dispose();
+    fresh.dispose();
+    if (done && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ar ? 'تم تعيين كلمة المرور الجديدة.' : 'The new password is set.')),
+      );
+    }
   }
 
   void _submit() {
@@ -138,6 +222,13 @@ class _LoginPageState extends State<LoginPage> {
                           PrimaryButton(
                             label: l10n.tr('login'),
                             onPressed: state.loading || _selectedUserId == null ? null : _submit,
+                          ),
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton(
+                              onPressed: _selectedUserId == null ? null : _forgot,
+                              child: Text(l10n.isArabic ? 'نسيت كلمة المرور؟' : 'Forgot password?'),
+                            ),
                           ),
                           if (state.error != null) ...[
                             const SizedBox(height: AppSpacing.md),

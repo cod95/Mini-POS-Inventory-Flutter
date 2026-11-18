@@ -39,7 +39,31 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadii.lg,
+          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+        space: 1,
+        thickness: 1,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: AppRadii.lg),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: AppRadii.md),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: AppRadii.md),
+          side: BorderSide(color: colorScheme.outlineVariant),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(
@@ -68,7 +92,9 @@ class AppTheme {
       ),
       appBarTheme: AppBarTheme(
         centerTitle: false,
-        surfaceTintColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        surfaceTintColor: Colors.transparent,
         backgroundColor: Colors.white,
         foregroundColor: colorScheme.onSurface,
       ),

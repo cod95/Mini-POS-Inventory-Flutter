@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:drift/drift.dart';
@@ -7,6 +8,7 @@ import '../../core/models/app_models.dart';
 import '../../core/security/secret_hasher.dart';
 import '../../core/utils/money_calculator.dart';
 import '../../data/local/db/app_database.dart';
+import '../../data/local/db/secure_connection.dart';
 import '../../domain/entities/app_entities.dart';
 import '../../domain/repositories/repositories.dart';
 
@@ -65,6 +67,15 @@ class LocalAuthRepository implements AuthRepository {
 
     // Old plain-text secrets are replaced by a salted hash on first success.
     final upgraded = SecretHasher.isHashed(row.secret) ? null : await SecretHasher.hash(secret);
+    if (row.role == UserRole.admin.value) {
+      // Lets an admin password recover the database key if the phone ever
+      // loses it (see DbSecurity).
+      unawaited(DbSecurity.rememberKey(
+        userUuid: row.uuid,
+        secret: secret,
+        secretHash: upgraded ?? row.secret,
+      ));
+    }
     await (_db.update(_db.userAccounts)..where((t) => t.id.equals(row.id))).write(
       UserAccountsCompanion(
         failedAttempts: const Value(0),
@@ -90,9 +101,13 @@ class LocalAuthRepository implements AuthRepository {
     final clean = newSecret.trim();
     final problem = SecretPolicy.check(clean, isAdmin: row.role == UserRole.admin.value);
     if (problem != null) throw AppException(problem);
+    final newHash = await SecretHasher.hash(clean);
+    if (row.role == UserRole.admin.value) {
+      unawaited(DbSecurity.rememberKey(userUuid: row.uuid, secret: clean, secretHash: newHash));
+    }
     await (_db.update(_db.userAccounts)..where((t) => t.id.equals(userId))).write(
       UserAccountsCompanion(
-        secret: Value(await SecretHasher.hash(clean)),
+        secret: Value(newHash),
         mustChangeSecret: const Value(false),
         failedAttempts: const Value(0),
         lockedUntil: const Value(null),
@@ -132,13 +147,19 @@ class LocalAuthRepository implements AuthRepository {
       throw AppException('This name is already used');
     }
 
+    final newHash = cleanSecret.isEmpty ? null : await SecretHasher.hash(cleanSecret);
+
     if (id == null) {
+      final uuid = newUuid();
+      if (role == UserRole.admin) {
+        unawaited(DbSecurity.rememberKey(userUuid: uuid, secret: cleanSecret, secretHash: newHash!));
+      }
       return _db.into(_db.userAccounts).insert(
             UserAccountsCompanion.insert(
-              uuid: newUuid(),
+              uuid: uuid,
               name: cleanName,
               role: role.value,
-              secret: await SecretHasher.hash(cleanSecret),
+              secret: newHash!,
               active: Value(active),
             ),
           );
@@ -153,11 +174,14 @@ class LocalAuthRepository implements AuthRepository {
       throw AppException('There must be at least one active admin');
     }
 
+    if (newHash != null && role == UserRole.admin) {
+      unawaited(DbSecurity.rememberKey(userUuid: existing.uuid, secret: cleanSecret, secretHash: newHash));
+    }
     await (_db.update(_db.userAccounts)..where((t) => t.id.equals(id))).write(
       UserAccountsCompanion(
         name: Value(cleanName),
         role: Value(role.value),
-        secret: cleanSecret.isEmpty ? const Value.absent() : Value(await SecretHasher.hash(cleanSecret)),
+        secret: newHash == null ? const Value.absent() : Value(newHash),
         mustChangeSecret: cleanSecret.isEmpty ? const Value.absent() : const Value(false),
         active: Value(active),
         // Editing an account also unlocks it.

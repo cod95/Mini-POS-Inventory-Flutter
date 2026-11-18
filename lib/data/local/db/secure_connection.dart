@@ -1,14 +1,21 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:pointycastle/export.dart' show SHA256Digest;
 import 'package:sqlcipher_flutter_libs/sqlcipher_flutter_libs.dart';
 import 'package:sqlite3/open.dart';
 import 'package:sqlite3/sqlite3.dart' as s3;
+
+import '../../../core/security/secret_hasher.dart';
+import '../../../core/security/sync_crypto.dart';
 
 /// Thrown when the database exists but cannot be opened (its key is gone).
 class DatabaseUnreadableException implements Exception {
@@ -226,6 +233,83 @@ class DbSecurity {
         },
       );
     });
+  }
+
+  // ------------------------------------------------------ key recovery wrap
+  //
+  // The database key lives in the phone's Keystore. As a safety net a copy is
+  // also kept encrypted under each admin's password, so if the Keystore is
+  // ever wiped an admin password brings the data back.
+
+  static const int _wrapRounds = 300000;
+
+  static Future<File> _wrapFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File(p.join(dir.path, 'dbkey.wrap'));
+  }
+
+  static List<Map<String, dynamic>> _readWrap(File file) {
+    try {
+      if (!file.existsSync()) return [];
+      final data = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      return [for (final e in (data['entries'] as List)) Map<String, dynamic>.from(e as Map)];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static String fingerprintOf(String secretHash) {
+    final digest = SHA256Digest().process(Uint8List.fromList(utf8.encode(secretHash)));
+    return digest.sublist(0, 8).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  /// Stores (or refreshes) the wrap for one admin. Never throws.
+  static Future<void> rememberKey({
+    required String userUuid,
+    required String secret,
+    required String secretHash,
+  }) async {
+    try {
+      if (status != 'encrypted') return;
+      final hex = await _readKey();
+      if (hex == null) return;
+      final fp = fingerprintOf(secretHash);
+      final file = await _wrapFile();
+      final entries = _readWrap(file);
+      if (entries.any((e) => e['u'] == userUuid && e['f'] == fp)) return;
+
+      final salt = SecretHasher.randomBytes(16);
+      final blob = await Isolate.run(() {
+        final k = SecretHasher.pbkdf2(secret, salt, _wrapRounds, 32);
+        return SyncCrypto.encryptSync(Uint8List.fromList(utf8.encode(hex)), k);
+      });
+      entries.removeWhere((e) => e['u'] == userUuid);
+      entries.add({'u': userUuid, 'f': fp, 's': base64.encode(salt), 'b': base64.encode(blob)});
+      await file.writeAsString(jsonEncode({'v': 1, 'entries': entries}), flush: true);
+    } catch (_) {}
+  }
+
+  /// Tries [secret] against every stored wrap; on success the key is put back
+  /// in the Keystore so the database opens again.
+  static Future<bool> recoverKey(String secret) async {
+    try {
+      final dbFile = await databaseFile();
+      for (final e in _readWrap(await _wrapFile())) {
+        try {
+          final salt = Uint8List.fromList(base64.decode('${e['s']}'));
+          final blob = Uint8List.fromList(base64.decode('${e['b']}'));
+          final hex = await Isolate.run(() {
+            final k = SecretHasher.pbkdf2(secret, salt, _wrapRounds, 32);
+            return utf8.decode(SyncCrypto.decryptSync(blob, k));
+          });
+          if (hex.length == 64 && _opens(dbFile, hex)) {
+            await _storage.write(key: _keyName, value: hex);
+            return true;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return false;
   }
 
   /// Last resort when the key is lost and there is no backup: puts the

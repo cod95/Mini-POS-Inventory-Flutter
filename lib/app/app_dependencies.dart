@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/license/license_service.dart';
 import '../core/services/barcode_scanner_service_impl.dart';
 import '../core/services/bluetooth_printer_service.dart';
 import '../core/services/file_export_service.dart';
@@ -33,6 +34,7 @@ class AppDependencies {
     required this.fileSyncService,
     required this.lanSyncService,
     required this.backupService,
+    required this.licenseService,
     required this.appCubit,
   });
 
@@ -56,6 +58,7 @@ class AppDependencies {
   final FileSyncService fileSyncService;
   final LanSyncService lanSyncService;
   final BackupService backupService;
+  final LicenseService licenseService;
 
   final AppCubit appCubit;
 
@@ -80,6 +83,8 @@ class AppDependencies {
     final fileSyncService = FileSyncService(db);
     final lanSyncService = LanSyncService(db, fileSyncService);
     final backupService = BackupService(db);
+    final licenseService = LicenseService();
+    await licenseService.init();
 
     final appCubit = AppCubit(
       authRepository: authRepository,
@@ -108,11 +113,13 @@ class AppDependencies {
       fileSyncService: fileSyncService,
       lanSyncService: lanSyncService,
       backupService: backupService,
+      licenseService: licenseService,
       appCubit: appCubit,
     );
   }
 
   Future<void> dispose() async {
+    licenseService.dispose();
     await lanSyncService.stop();
     await appCubit.close();
     await database.close();

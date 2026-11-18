@@ -235,6 +235,18 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: AppSpacing.md),
               Card(
                 child: ListTile(
+                  leading: const Icon(Icons.workspace_premium_outlined),
+                  title: Text(l10n.isArabic ? 'الترخيص' : 'Licence'),
+                  subtitle: Text(
+                    l10n.isArabic ? 'حالة الترخيص ورقم الجهاز والتجديد' : 'Licence status, device number and renewal',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/settings/license'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Card(
+                child: ListTile(
                   leading: const Icon(Icons.lock_outline),
                   title: Text(l10n.isArabic ? 'تغيير كلمة المرور' : 'Change my password'),
                   trailing: const Icon(Icons.chevron_right),

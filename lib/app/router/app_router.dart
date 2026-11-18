@@ -9,6 +9,8 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/backup/presentation/pages/backup_page.dart';
 import '../../features/data_tools/presentation/pages/data_tools_page.dart';
 import '../../features/invoices/presentation/pages/invoice_detail_page.dart';
+import '../../features/license/presentation/pages/license_page.dart';
+import '../../features/license/presentation/pages/lock_page.dart';
 import '../../features/invoices/presentation/pages/invoices_page.dart';
 import '../../features/pos/presentation/pages/pos_page.dart';
 import '../../features/products/presentation/pages/products_page.dart';
@@ -25,8 +27,17 @@ class AppRouter {
       : router = GoRouter(
           navigatorKey: dependencies.rootNavigatorKey,
           initialLocation: '/login',
-          refreshListenable: GoRouterRefreshStream(dependencies.appCubit.stream),
+          refreshListenable: Listenable.merge([
+            GoRouterRefreshStream(dependencies.appCubit.stream),
+            dependencies.licenseService,
+          ]),
           redirect: (context, state) {
+            // Without a valid licence nothing but the lock screen is reachable.
+            final open = dependencies.licenseService.isOpen;
+            final onLock = state.uri.path == '/locked';
+            if (!open && !onLock) return '/locked';
+            if (open && onLock) return '/login';
+
             final isAuthenticated = dependencies.appCubit.state.isAuthenticated;
             final isLoginRoute = state.uri.path == '/login';
 
@@ -58,6 +69,10 @@ class AppRouter {
             return null;
           },
           routes: [
+            GoRoute(
+              path: '/locked',
+              builder: (context, state) => const LockPage(),
+            ),
             GoRoute(
               path: '/login',
               builder: (context, state) => const LoginPage(),
@@ -127,6 +142,10 @@ class AppRouter {
                     GoRoute(
                       path: 'data',
                       builder: (context, state) => const DataToolsPage(),
+                    ),
+                    GoRoute(
+                      path: 'license',
+                      builder: (context, state) => const LicensePage(),
                     ),
                     GoRoute(
                       path: 'backup',
