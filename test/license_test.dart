@@ -8,7 +8,7 @@ const _y = '4a5a787cb5acfb912230f2bed5acd76100d290c06fb2a453d99f46e339624268';
 const _good = 'QS1.eyJ2IjoxLCJkIjoiUVMtVEVTVC0wMDAwLTAwMDEiLCJjIjoiVGVzdCBTaG9wIiwiZSI6IjIwOTktMTItMzEiLCJpIjoiMjAyNi0xMS0xOCJ9.f61X_upVBV4zEFDoYVo0J8WD5G3mw1erk-eeAK7xd9YH2PsdhcAjXQTmSold-4niH_4H2dGJ9iVkHmMGsxhVfw';
 const _perpetual = 'QS1.eyJ2IjoxLCJkIjoiUVMtVEVTVC0wMDAwLTAwMDEiLCJjIjoiUGVycCIsImUiOm51bGwsImkiOiIyMDI2LTExLTE4In0.xA3C6V7wDPvr3cv0_wLe-a_OLdnjXH4ieQiFYQ0OzrkEIdd1STxclO8T8fGSTuf7UzyayNj1C-u5Lr32ivq4Cw';
 const _expired = 'QS1.eyJ2IjoxLCJkIjoiUVMtVEVTVC0wMDAwLTAwMDEiLCJjIjoiT2xkIiwiZSI6IjIwMjAtMDEtMDEiLCJpIjoiMjAxOS0wMS0wMSJ9.l23QoGvmOQNVH6HiiZHBKm7mwn-lERDLsw9svf92TUgFwFMQ8Al2GeS4cSvodnLNjYL0zCSYz8E9Rk5pt8xNmA';
-const _verifier = 'pbkdf2$200000$XqN7ytGt4nUEfZ7iF1kz2A==$P1U9LfYwh2xDuNWWtyO5DXVg+kdpYAKQU+qz5CuK/F8=';
+const _verifier = r'pbkdf2$200000$XqN7ytGt4nUEfZ7iF1kz2A==$P1U9LfYwh2xDuNWWtyO5DXVg+kdpYAKQU+qz5CuK/F8=';
 
 void main() {
   test('valid licence verifies and exposes its content', () {
