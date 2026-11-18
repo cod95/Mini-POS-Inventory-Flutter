@@ -332,8 +332,10 @@ class LocalProductRepository implements ProductRepository {
 
   @override
   Future<int> upsertProduct(ProductUpsertInput input) async {
+    final now = DateTime.now();
+
     if (input.id == null) {
-      return _db.into(_db.products).insert(
+      final id = await _db.into(_db.products).insert(
             ProductsCompanion.insert(
               name: input.name.trim(),
               sku: input.sku.trim(),
@@ -347,11 +349,27 @@ class LocalProductRepository implements ProductRepository {
               notes: Value(input.notes),
               imagePath: Value(input.imagePath),
               taxable: Value(input.taxable),
-              createdAt: Value(DateTime.now()),
-              updatedAt: Value(DateTime.now()),
+              createdAt: Value(now),
+              updatedAt: Value(now),
+              catalogUpdatedAt: Value(now),
             ),
           );
+      if (input.stockQty != 0) {
+        await _db.into(_db.stockMovements).insert(
+              StockMovementsCompanion.insert(
+                productId: id,
+                type: StockMovementType.add.value,
+                qtyChange: input.stockQty,
+                reason: const Value('Opening stock'),
+                createdAt: Value(now),
+              ),
+            );
+      }
+      return id;
     }
+
+    final existing = await (_db.select(_db.products)..where((tbl) => tbl.id.equals(input.id!)))
+        .getSingleOrNull();
 
     await (_db.update(_db.products)..where((tbl) => tbl.id.equals(input.id!))).write(
       ProductsCompanion(
@@ -367,9 +385,23 @@ class LocalProductRepository implements ProductRepository {
         notes: Value(input.notes),
         imagePath: Value(input.imagePath),
         taxable: Value(input.taxable),
-        updatedAt: Value(DateTime.now()),
+        updatedAt: Value(now),
+        catalogUpdatedAt: Value(now),
       ),
     );
+
+    // Every stock change is a movement, so a sync can replay it elsewhere.
+    if (existing != null && existing.stockQty != input.stockQty) {
+      await _db.into(_db.stockMovements).insert(
+            StockMovementsCompanion.insert(
+              productId: input.id!,
+              type: StockMovementType.adjust.value,
+              qtyChange: input.stockQty - existing.stockQty,
+              reason: const Value('Edit product'),
+              createdAt: Value(now),
+            ),
+          );
+    }
 
     return input.id!;
   }
@@ -908,28 +940,36 @@ class LocalSalesRepository implements SalesRepository {
     );
   }
 
-  Future<String> _nextInvoiceNo(DateTime now) async {
-    final datePart =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final countExp = _db.sales.id.count();
-    final query = _db.selectOnly(_db.sales)
-      ..addColumns([countExp])
-      ..where(_db.sales.invoiceNo.like('INV-$datePart-%'));
-    final count = (await query.getSingleOrNull())?.read(countExp) ?? 0;
-    final sequence = (count + 1).toString().padLeft(4, '0');
-    return 'INV-$datePart-$sequence';
+  Future<String> _deviceCode() async {
+    final row = await (_db.select(_db.appSettings)..where((tbl) => tbl.id.equals(1)))
+        .getSingleOrNull();
+    return (row?.deviceCode ?? '').trim();
   }
 
-  Future<String> _nextReturnInvoiceNo(DateTime now) async {
+  Future<String> _nextInvoiceNo(DateTime now) => _nextNumber('INV', now);
+
+  Future<String> _nextReturnInvoiceNo(DateTime now) => _nextNumber('RET', now);
+
+  /// INV-20261118-0001 on the main device, INV-B-20261118-0001 on a device
+  /// whose code is "B". Never returns a number that already exists.
+  Future<String> _nextNumber(String kind, DateTime now) async {
+    final code = await _deviceCode();
     final datePart =
         '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    final prefix = code.isEmpty ? '$kind-$datePart-' : '$kind-$code-$datePart-';
     final countExp = _db.sales.id.count();
     final query = _db.selectOnly(_db.sales)
       ..addColumns([countExp])
-      ..where(_db.sales.invoiceNo.like('RET-$datePart-%'));
-    final count = (await query.getSingleOrNull())?.read(countExp) ?? 0;
-    final sequence = (count + 1).toString().padLeft(4, '0');
-    return 'RET-$datePart-$sequence';
+      ..where(_db.sales.invoiceNo.like('$prefix%'));
+    var sequence = ((await query.getSingleOrNull())?.read(countExp) ?? 0) + 1;
+
+    while (true) {
+      final candidate = '$prefix${sequence.toString().padLeft(4, '0')}';
+      final taken = await (_db.select(_db.sales)..where((tbl) => tbl.invoiceNo.equals(candidate)))
+          .getSingleOrNull();
+      if (taken == null) return candidate;
+      sequence++;
+    }
   }
 }
 

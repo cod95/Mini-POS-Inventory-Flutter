@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -6,6 +7,18 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 part 'app_database.g.dart';
+
+/// Random 128-bit id (hex). Rows that travel between devices (products,
+/// sales, sale items, stock movements) carry one so a sync can recognise
+/// them without clashing on local auto-increment ids.
+String newUuid() {
+  final random = Random.secure();
+  final buffer = StringBuffer();
+  for (var i = 0; i < 16; i++) {
+    buffer.write(random.nextInt(256).toRadixString(16).padLeft(2, '0'));
+  }
+  return buffer.toString();
+}
 
 class Products extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -40,6 +53,13 @@ class Products extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// Sync identity of this product (same on every device).
+  TextColumn get uuid => text().nullable().clientDefault(newUuid)();
+
+  /// Last time the product's catalog data (name, price…) was edited. Stock
+  /// movements do not touch it, so a sync can tell who edited the price last.
+  DateTimeColumn get catalogUpdatedAt => dateTime().nullable()();
 }
 
 class Categories extends Table {
@@ -61,6 +81,8 @@ class StockMovements extends Table {
   TextColumn get reason => text().nullable()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  TextColumn get uuid => text().nullable().clientDefault(newUuid)();
 }
 
 class Customers extends Table {
@@ -150,6 +172,8 @@ class Sales extends Table {
 
   /// Name of the user (cashier/admin) who made the sale.
   TextColumn get cashierName => text().nullable()();
+
+  TextColumn get uuid => text().nullable().clientDefault(newUuid)();
 }
 
 class SaleItems extends Table {
@@ -178,6 +202,8 @@ class SaleItems extends Table {
   /// For rows of a return document: the sale item being returned. Used to
   /// know how much of each original line was already returned.
   IntColumn get originalItemId => integer().nullable()();
+
+  TextColumn get uuid => text().nullable().clientDefault(newUuid)();
 }
 
 /// Login accounts. `role` is 'admin' or 'cashier'; `secret` is the password
@@ -247,6 +273,14 @@ class AppSettings extends Table {
 
   TextColumn get adminPassword => text().withDefault(const Constant('admin123'))();
 
+  /// Random id of this phone/installation (used by sync).
+  TextColumn get deviceId => text().nullable()();
+
+  /// Short code put in this device's invoice numbers (e.g. 'B' gives
+  /// INV-B-20261118-0001) so two phones never issue the same number. Empty
+  /// on the main device.
+  TextColumn get deviceCode => text().withDefault(const Constant(''))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -269,7 +303,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -307,6 +341,21 @@ class AppDatabase extends _$AppDatabase {
           if (from < 9) {
             await m.createTable(userAccounts);
             await m.addColumn(sales, sales.cashierName);
+          }
+          if (from < 10) {
+            await m.addColumn(products, products.uuid);
+            await m.addColumn(products, products.catalogUpdatedAt);
+            await m.addColumn(stockMovements, stockMovements.uuid);
+            await m.addColumn(sales, sales.uuid);
+            await m.addColumn(saleItems, saleItems.uuid);
+            await m.addColumn(appSettings, appSettings.deviceId);
+            await m.addColumn(appSettings, appSettings.deviceCode);
+            for (final table in ['products', 'stock_movements', 'sales', 'sale_items']) {
+              await customStatement(
+                "UPDATE $table SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL",
+              );
+            }
+            await customStatement('UPDATE products SET catalog_updated_at = updated_at');
           }
         },
       );

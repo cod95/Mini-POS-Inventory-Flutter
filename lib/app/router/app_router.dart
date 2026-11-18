@@ -12,6 +12,7 @@ import '../../features/pos/presentation/pages/pos_page.dart';
 import '../../features/products/presentation/pages/products_page.dart';
 import '../../features/reports/presentation/pages/reports_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/sync/presentation/pages/sync_page.dart';
 import '../../features/users/presentation/pages/account_page.dart';
 import '../../features/users/presentation/pages/users_page.dart';
 import '../../features/shell/presentation/pages/app_shell_page.dart';
@@ -96,6 +97,10 @@ class AppRouter {
                           ? const SettingsPage()
                           : const AccountPage(),
                   routes: [
+                    GoRoute(
+                      path: 'sync',
+                      builder: (context, state) => const SyncPage(),
+                    ),
                     GoRoute(
                       path: 'users',
                       builder: (context, state) => const UsersPage(),

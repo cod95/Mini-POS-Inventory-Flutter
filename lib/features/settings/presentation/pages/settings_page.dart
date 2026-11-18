@@ -234,6 +234,20 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               const SizedBox(height: AppSpacing.md),
               Card(
+                child: ListTile(
+                  leading: const Icon(Icons.sync),
+                  title: Text(l10n.isArabic ? 'المزامنة بين الأجهزة' : 'Device sync'),
+                  subtitle: Text(
+                    l10n.isArabic
+                        ? 'نقل المبيعات والمخزون بين تلفونك وتلفون الموظف'
+                        : 'Move sales and stock between your phone and the employee phone',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/settings/sync'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Card(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   child: Column(
