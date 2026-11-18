@@ -51,12 +51,16 @@
     <input id="keyfile" type="file" accept=".json,application/json">
     <div class="row">
       <div>
-        <label for="device">رقم الجهاز (يظهر على شاشة القفل)</label>
+        <label for="device">رقم الجهاز: رقم الهاتف الرئيسي (هاتف المدير). يظهر في الإعدادات ← الترخيص</label>
         <input id="device" type="text" class="ltr" placeholder="QS-XXXX-XXXX-XXXX">
       </div>
       <div>
         <label for="customer">اسم الزبون / المحل</label>
         <input id="customer" type="text">
+      </div>
+      <div>
+        <label for="devices">عدد الأجهزة المسموح بها (الهاتف الرئيسي + هواتف الموظفين)</label>
+        <input id="devices" type="number" min="1" max="500" value="1">
       </div>
       <div>
         <label for="expiry">تاريخ الانتهاء (اتركه فارغاً لترخيص دائم)</label>
@@ -141,7 +145,9 @@ if (typeof document !== 'undefined') {
       out.innerHTML = '<p class="warn">رقم الجهاز غير صحيح. الشكل: QS-XXXX-XXXX-XXXX</p>'; return;
     }
     const expiry = $('expiry').value || null;
-    const payload = { v: 1, d: device, c: $('customer').value.trim(), e: expiry, i: new Date().toISOString().slice(0, 10) };
+    const devices = parseInt($('devices').value, 10);
+    if (!(devices >= 1 && devices <= 500)) { out.innerHTML = '<p class="warn">عدد الأجهزة يجب أن يكون بين 1 و500.</p>'; return; }
+    const payload = { v: 1, d: device, c: $('customer').value.trim(), n: devices, e: expiry, i: new Date().toISOString().slice(0, 10) };
     try {
       const token = await signToken(privateJwk, payload);
       out.innerHTML = '<p class="ok">الترخيص جاهز. انسخه وأرسله للزبون:</p><textarea readonly onclick="this.select()">' + token + '</textarea>';

@@ -29,6 +29,10 @@ class LicensePage extends StatelessWidget {
           final String status;
           if (!LicenseConfig.configured) {
             status = ar ? 'نظام الترخيص غير مفعّل في هذه النسخة.' : 'Licensing is not enabled in this build.';
+          } else if (info.isSeat) {
+            status = ar
+                ? 'جهاز موظف يعمل بترخيص المحل عبر هاتف المدير. يتجدد تلقائياً عند كل مزامنة معه، وإن انقطع الاتصال يعمل حتى ${_date(info.leaseUntil!)}.'
+                : 'Employee phone working under the shop licence through the admin phone. It renews at every sync, and works without contact until ${_date(info.leaseUntil!)}.';
           } else if (!service.full && info.state != LicenseState.clockTampered) {
             status = ar
                 ? 'نسخة تجريبية محدودة (حتى ${LicenseGate.trialMaxProducts} منتجاً و${LicenseGate.trialMaxInvoices} فواتير، دون مستخدمين جدد أو مزامنة أو Excel). أدخل رمز التفعيل لإزالة القيود.'
@@ -58,6 +62,23 @@ class LicensePage extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               DeviceIdCard(deviceId: service.deviceId, ar: ar),
+              if (service.full && !info.isSeat && info.devices > 1) ...[
+                const SizedBox(height: AppSpacing.md),
+                SeatsCard(service: service, ar: ar),
+              ],
+              if (!service.full && service.seatError != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  service.seatError == 'FULL'
+                      ? (ar
+                          ? 'رفض هاتف المدير تفعيل هذا الهاتف لأن عدد الأجهزة المسموح بها اكتمل.'
+                          : 'The admin phone refused this phone: the allowed number of devices is reached.')
+                      : (ar
+                          ? 'هاتف المدير غير مرخّص حالياً.'
+                          : 'The admin phone has no valid licence at the moment.'),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
               if (LicenseConfig.configured) ...[
                 const SizedBox(height: AppSpacing.lg),
                 Text(

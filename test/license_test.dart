@@ -10,7 +10,22 @@ const _perpetual = 'QS1.eyJ2IjoxLCJkIjoiUVMtVEVTVC0wMDAwLTAwMDEiLCJjIjoiUGVycCIs
 const _expired = 'QS1.eyJ2IjoxLCJkIjoiUVMtVEVTVC0wMDAwLTAwMDEiLCJjIjoiT2xkIiwiZSI6IjIwMjAtMDEtMDEiLCJpIjoiMjAxOS0wMS0wMSJ9.l23QoGvmOQNVH6HiiZHBKm7mwn-lERDLsw9svf92TUgFwFMQ8Al2GeS4cSvodnLNjYL0zCSYz8E9Rk5pt8xNmA';
 const _verifier = r'pbkdf2$200000$XqN7ytGt4nUEfZ7iF1kz2A==$P1U9LfYwh2xDuNWWtyO5DXVg+kdpYAKQU+qz5CuK/F8=';
 
+// Second key pair, produced by the same tool, with device counts.
+const _x2 = '38346f1f4dc696ca6688aaa432b6c66c8c3c8a5af568b3693581c984e9f57217';
+const _y2 = '7b87a9859e45bf74e9f18c36c85663314056a503d744f6beed4552a7fcb28a93';
+const _multi = 'QS1.eyJ2IjoxLCJkIjoiUVMtVEVTVC0wMDAwLTAwMDEiLCJjIjoiQ2FmZSBUZXN0IiwibiI6MywiZSI6bnVsbCwiaSI6IjIwMjYtMTEtMTkifQ.dss0MetF6TB-VNsdTIJuhS6k6GwEwvbdhr0unqnflP-8tb3YGobG9Vw8JG5o54QioKcwP3WU6NVlrQPpt-3tMQ';
+const _noCount = 'QS1.eyJ2IjoxLCJkIjoiUVMtVEVTVC0wMDAwLTAwMDEiLCJjIjoiT2xkIiwiZSI6bnVsbCwiaSI6IjIwMjYtMTEtMTkifQ.0QiiHrfzbKkirAj6Psb1ioaQz6btisVUIzwpR2tKxK42zZxyByCKaFegdDrUunfdO2hU1f2Fj1CkxKNhvoJNmg';
+const _huge = 'QS1.eyJ2IjoxLCJkIjoiUVMtVEVTVC0wMDAwLTAwMDEiLCJjIjoiQmlnIiwibiI6OTk5OTksImUiOm51bGwsImkiOiIyMDI2LTExLTE5In0.ETEzMreBcVZsVsgOqSjcOSuswqLwgXsKW2tCxuK7d0iuCcnrN3cgS4v2WjEk7b8555ea5ARjSxRWoP7LG0RBpA';
+
 void main() {
+  test('device count is read, defaults to 1 and is capped', () {
+    expect(LicenseVerifier.verify(_multi, _x2, _y2)!.devices, 3);
+    expect(LicenseVerifier.verify(_multi, _x2, _y2)!.customer, 'Cafe Test');
+    expect(LicenseVerifier.verify(_noCount, _x2, _y2)!.devices, 1);
+    expect(LicenseVerifier.verify(_huge, _x2, _y2)!.devices, 500);
+    expect(LicenseVerifier.verify(_multi, _x, _y), isNull);
+  });
+
   test('valid licence verifies and exposes its content', () {
     final p = LicenseVerifier.verify(_good, _x, _y);
     expect(p, isNotNull);

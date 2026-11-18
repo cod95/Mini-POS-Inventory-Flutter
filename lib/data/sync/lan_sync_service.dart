@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../core/license/license_service.dart';
 import '../../core/security/sync_crypto.dart';
 import '../local/db/app_database.dart';
 import 'file_sync_service.dart';
@@ -71,10 +72,11 @@ class _Peer {
 /// AES-256-GCM encrypted with the shop code; a phone that does not know the
 /// code cannot read, send or even be recognised.
 class LanSyncService {
-  LanSyncService(this._db, this._sync);
+  LanSyncService(this._db, this._sync, this._license);
 
   final AppDatabase _db;
   final FileSyncService _sync;
+  final LicenseService _license;
 
   static const int tcpPort = 48484;
   static const int udpPort = 48485;
@@ -133,7 +135,12 @@ class LanSyncService {
 
       await _ensureUdp(key);
       if (s.isMainDevice) {
-        await _ensureServer();
+        // A main phone without a full licence does not serve the others.
+        if (_license.full) {
+          await _ensureServer();
+        } else {
+          await _stopServer();
+        }
       } else {
         await _stopServer();
       }
@@ -247,6 +254,7 @@ class LanSyncService {
       final pulled = await _post(address, port, '/sync/pull', key, {
         'since': peerRow?.lastPullAt == null ? null : peerRow!.lastPullAt!.toUtc().toIso8601String(),
       });
+      await _license.applyLease(pulled['lease']);
       final package = pulled['package'] as Map<String, dynamic>;
       final serverTime = DateTime.tryParse('${pulled['serverTime']}')?.toLocal() ?? pullAt;
       final realHubId = '${package['deviceId'] ?? hubId ?? address}';
@@ -282,6 +290,9 @@ class LanSyncService {
       _setStatus(status.value.copyWith(state: 'error', error: 'UNREACHABLE'));
       return 'UNREACHABLE';
     } on _SyncHttpError catch (e) {
+      if (e.code.startsWith('SEAT_')) {
+        await _license.applyLease({'error': e.code.substring(5)});
+      }
       _setStatus(status.value.copyWith(state: 'error', error: e.code));
       return e.code;
     } catch (e) {
@@ -375,6 +386,17 @@ class LanSyncService {
       }
       if (response.statusCode == 403) throw const _SyncHttpError('WRONG_CODE');
       if (response.statusCode == 408) throw const _SyncHttpError('CLOCK');
+      if (response.statusCode == 402) {
+        // The main phone refused a seat: its answer says why.
+        try {
+          final answer = await _open(bytes.toBytes(), key);
+          final lease = answer['lease'];
+          final why = lease is Map ? '${lease['error'] ?? 'UNLICENSED'}' : 'UNLICENSED';
+          throw _SyncHttpError('SEAT_$why');
+        } on SyncDecryptException {
+          throw const _SyncHttpError('WRONG_CODE');
+        }
+      }
       if (response.statusCode != 200) throw _SyncHttpError('HTTP_${response.statusCode}');
       try {
         return await _open(bytes.toBytes(), key);
@@ -444,6 +466,15 @@ class LanSyncService {
         return reply(408);
       }
 
+      // Every request must come from a phone that holds a seat.
+      final lease = await _license.grantSeat('${message['deviceId'] ?? ''}');
+      if (lease['error'] != null) {
+        return reply(
+          402,
+          await _seal({'ts': DateTime.now().toUtc().toIso8601String(), 'lease': lease}, key),
+        );
+      }
+
       switch (request.uri.path) {
         case '/sync/pull':
           final serverTime = DateTime.now();
@@ -455,6 +486,7 @@ class LanSyncService {
             await _seal({
               'ts': DateTime.now().toUtc().toIso8601String(),
               'serverTime': serverTime.toUtc().toIso8601String(),
+              'lease': lease,
               'package': package,
             }, key),
           );

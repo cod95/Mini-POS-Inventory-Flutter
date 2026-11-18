@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -23,6 +24,9 @@ class LicenseInfo {
     this.customer,
     this.expiry,
     this.masterUntil,
+    this.devices = 1,
+    this.isSeat = false,
+    this.leaseUntil,
   });
 
   final LicenseState state;
@@ -31,6 +35,23 @@ class LicenseInfo {
 
   /// Set while the developer's master password is keeping the app open.
   final DateTime? masterUntil;
+
+  /// Phones covered by the licence (main phone included).
+  final int devices;
+
+  /// True on an employee phone running under the main phone's licence.
+  final bool isSeat;
+
+  /// Employee phone: how long it may work without reaching the main phone.
+  final DateTime? leaseUntil;
+}
+
+/// One employee phone registered on the main phone.
+class SeatInfo {
+  const SeatInfo(this.id, this.lastSeen);
+
+  final String id;
+  final DateTime lastSeen;
 }
 
 /// Ties each installation to one device and to a licence code signed by the
@@ -43,6 +64,11 @@ class LicenseService extends ChangeNotifier implements LicenseGate {
   static const String _kSeen = 'qs_last_seen';
   static const String _kGrant = 'qs_master_grant';
   static const String _kFail = 'qs_master_fail';
+  static const String _kLease = 'qs_lease';
+  static const String _kSeats = 'qs_seats';
+
+  /// An employee phone keeps working this long without reaching the main phone.
+  static const Duration leaseDuration = Duration(days: 30);
   static const String _alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
@@ -50,6 +76,9 @@ class LicenseService extends ChangeNotifier implements LicenseGate {
   );
 
   String deviceId = '';
+
+  /// Last reason the main phone refused this phone a seat: FULL or UNLICENSED.
+  String? seatError;
   LicenseInfo info = const LicenseInfo();
   Timer? _timer;
 
@@ -126,7 +155,10 @@ class LicenseService extends ChangeNotifier implements LicenseGate {
     final changed = next.state != info.state ||
         next.expiry != info.expiry ||
         next.masterUntil != info.masterUntil ||
-        next.customer != info.customer;
+        next.customer != info.customer ||
+        next.devices != info.devices ||
+        next.isSeat != info.isSeat ||
+        next.leaseUntil != info.leaseUntil;
     info = next;
     if (changed) notifyListeners();
   }
@@ -167,6 +199,11 @@ class LicenseService extends ChangeNotifier implements LicenseGate {
       return LicenseInfo(customer: customer, expiry: expiry, masterUntil: masterUntil);
     }
     if (tampered) return LicenseInfo(state: LicenseState.clockTampered, customer: customer, expiry: expiry);
+    if (payload == null || payload.deviceId != deviceId) {
+      // An employee phone works under the main phone's licence.
+      final seat = await _leaseInfo(now);
+      if (seat != null) return seat;
+    }
     if (payload == null) return const LicenseInfo(state: LicenseState.notActivated);
     if (payload.deviceId != deviceId) {
       return LicenseInfo(state: LicenseState.wrongDevice, customer: customer);
@@ -174,7 +211,117 @@ class LicenseService extends ChangeNotifier implements LicenseGate {
     if (expiry != null && !now.isBefore(DateTime(expiry.year, expiry.month, expiry.day + 1))) {
       return LicenseInfo(state: LicenseState.expired, customer: customer, expiry: expiry);
     }
-    return LicenseInfo(customer: customer, expiry: expiry);
+    return LicenseInfo(customer: customer, expiry: expiry, devices: payload.devices);
+  }
+
+  // ------------------------------------------------------------------ seats
+
+  bool _expired(DateTime? expiry, DateTime now) =>
+      expiry != null && !now.isBefore(DateTime(expiry.year, expiry.month, expiry.day + 1));
+
+  Future<LicenseInfo?> _leaseInfo(DateTime now) async {
+    final raw = await _read(_kLease, 'qs_lease.txt');
+    if (raw == null) return null;
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final payload = LicenseVerifier.verify('${map['t']}', LicenseConfig.publicKeyX, LicenseConfig.publicKeyY);
+      final at = DateTime.fromMillisecondsSinceEpoch((map['a'] as num).toInt());
+      if (payload == null || payload.deviceId == deviceId || payload.devices < 2) return null;
+      if (_expired(payload.expiry, now)) return null;
+      if (now.difference(at) > leaseDuration) return null;
+      if (at.isAfter(now.add(const Duration(days: 1)))) return null;
+      return LicenseInfo(
+        customer: payload.customer,
+        expiry: payload.expiry,
+        devices: payload.devices,
+        isSeat: true,
+        leaseUntil: at.add(leaseDuration),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<({String token, LicensePayload payload})?> _ownLicence(DateTime now) async {
+    final token = await _read(_kToken, 'qs_license.key');
+    if (token == null) return null;
+    final payload = LicenseVerifier.verify(token, LicenseConfig.publicKeyX, LicenseConfig.publicKeyY);
+    if (payload == null || payload.deviceId != deviceId || _expired(payload.expiry, now)) return null;
+    return (token: token, payload: payload);
+  }
+
+  Future<List<Map<String, dynamic>>> _loadSeats() async {
+    try {
+      final raw = await _read(_kSeats, 'qs_seats.txt');
+      if (raw == null) return [];
+      return (jsonDecode(raw) as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _saveSeats(List<Map<String, dynamic>> seats) =>
+      _write(_kSeats, 'qs_seats.txt', jsonEncode(seats));
+
+  /// Main phone: registers the employee phone [clientId] (or confirms it) and
+  /// hands it the licence to run under. Returns `{token, devices}` or
+  /// `{error: FULL | UNLICENSED}`.
+  Future<Map<String, dynamic>> grantSeat(String clientId) async {
+    if (!enforced) return {'ok': true};
+    final now = DateTime.now();
+    if (info.state == LicenseState.clockTampered) return {'error': 'UNLICENSED'};
+    final own = await _ownLicence(now);
+    if (own == null || clientId.isEmpty || clientId == deviceId) return {'error': 'UNLICENSED'};
+    final seats = await _loadSeats();
+    final i = seats.indexWhere((s) => s['id'] == clientId);
+    if (i >= 0) {
+      seats[i]['at'] = now.millisecondsSinceEpoch;
+    } else {
+      if (seats.length >= own.payload.devices - 1) {
+        return {'error': 'FULL', 'devices': own.payload.devices};
+      }
+      seats.add({'id': clientId, 'at': now.millisecondsSinceEpoch});
+    }
+    await _saveSeats(seats);
+    notifyListeners();
+    return {'token': own.token, 'devices': own.payload.devices};
+  }
+
+  /// Employee phone: stores what the main phone answered.
+  Future<void> applyLease(Object? lease) async {
+    if (!enforced || lease is! Map) return;
+    final error = lease['error'];
+    if (error == 'FULL' || error == 'UNLICENSED') {
+      seatError = '$error';
+      await _write(_kLease, 'qs_lease.txt', '');
+      await check();
+      notifyListeners();
+      return;
+    }
+    final token = '${lease['token'] ?? ''}';
+    final payload = LicenseVerifier.verify(token, LicenseConfig.publicKeyX, LicenseConfig.publicKeyY);
+    if (payload == null || payload.deviceId == deviceId || payload.devices < 2) return;
+    seatError = null;
+    await _write(
+      _kLease,
+      'qs_lease.txt',
+      jsonEncode({'t': token, 'a': DateTime.now().millisecondsSinceEpoch}),
+    );
+    await check();
+  }
+
+  /// Main phone: the employee phones registered so far.
+  Future<List<SeatInfo>> seats() async => [
+        for (final s in await _loadSeats())
+          SeatInfo('${s['id']}', DateTime.fromMillisecondsSinceEpoch((s['a'] as num).toInt())),
+      ];
+
+  /// Main phone: frees the place of a lost or replaced phone.
+  Future<void> releaseSeat(String id) async {
+    final seats = await _loadSeats();
+    seats.removeWhere((s) => s['id'] == id);
+    await _saveSeats(seats);
+    notifyListeners();
   }
 
   // ------------------------------------------------------------- activation

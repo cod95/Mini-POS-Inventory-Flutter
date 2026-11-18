@@ -187,6 +187,15 @@ class _LoginPageState extends State<LoginPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(l10n.tr('appTitle'), style: Theme.of(context).textTheme.headlineMedium),
+                          if ((AppScope.of(context).licenseService.info.customer ?? '').isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              l10n.isArabic
+                                  ? 'مرخّص باسم: ${AppScope.of(context).licenseService.info.customer}'
+                                  : 'Licensed to: ${AppScope.of(context).licenseService.info.customer}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                           const SizedBox(height: AppSpacing.sm),
                           Text(l10n.tr('login'), style: Theme.of(context).textTheme.titleMedium),
                           const SizedBox(height: AppSpacing.xl),

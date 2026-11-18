@@ -161,3 +161,92 @@ class TrialLockedBody extends StatelessWidget {
     );
   }
 }
+
+/// Main phone: the employee phones that hold a seat, with a button to free one.
+class SeatsCard extends StatefulWidget {
+  const SeatsCard({super.key, required this.service, required this.ar});
+
+  final LicenseService service;
+  final bool ar;
+
+  @override
+  State<SeatsCard> createState() => _SeatsCardState();
+}
+
+class _SeatsCardState extends State<SeatsCard> {
+  late Future<List<SeatInfo>> _seats = widget.service.seats();
+
+  String _date(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _release(SeatInfo seat) async {
+    final ar = widget.ar;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ar ? 'تحرير مكان الجهاز' : 'Free this device place'),
+        content: Text(
+          ar
+              ? 'سيُحرَّر مكان الجهاز ${seat.id} ليتمكن هاتف آخر من الانضمام. يتوقف الجهاز القديم عن العمل بالترخيص عند أول مزامنة له.'
+              : 'The place of ${seat.id} will be freed for another phone. The old phone stops using the licence at its next sync.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(ar ? 'إلغاء' : 'Cancel')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(ar ? 'تحرير' : 'Free')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await widget.service.releaseSeat(seat.id);
+    if (!mounted) return;
+    setState(() => _seats = widget.service.seats());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = widget.ar;
+    final total = widget.service.info.devices;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: FutureBuilder<List<SeatInfo>>(
+          future: _seats,
+          builder: (context, snap) {
+            final seats = snap.data ?? const <SeatInfo>[];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  ar
+                      ? 'الأجهزة: ${seats.length + 1} من $total (هذا الهاتف + هواتف الموظفين)'
+                      : 'Devices: ${seats.length + 1} of $total (this phone + employee phones)',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                if (seats.isEmpty)
+                  Text(
+                    ar
+                        ? 'لا توجد هواتف موظفين بعد. أدخل رمز المحل على هاتف الموظف وهو على شبكة الواي فاي نفسها.'
+                        : 'No employee phones yet. Enter the shop code on the employee phone while on the same Wi-Fi.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                for (final seat in seats)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.smartphone),
+                    title: Text(seat.id),
+                    subtitle: Text(ar ? 'آخر اتصال: ${_date(seat.lastSeen)}' : 'Last seen: ${_date(seat.lastSeen)}'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.link_off),
+                      tooltip: ar ? 'تحرير المكان' : 'Free the place',
+                      onPressed: () => _release(seat),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}

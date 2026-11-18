@@ -84,7 +84,7 @@ class AppDependencies {
     final bluetoothPrinterService = BluetoothPrinterService();
     final syncService = FakeSyncService();
     final fileSyncService = FileSyncService(db);
-    final lanSyncService = LanSyncService(db, fileSyncService);
+    final lanSyncService = LanSyncService(db, fileSyncService, licenseService);
     final backupService = BackupService(db);
     final appCubit = AppCubit(
       authRepository: authRepository,

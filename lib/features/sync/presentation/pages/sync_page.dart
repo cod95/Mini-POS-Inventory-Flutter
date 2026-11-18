@@ -85,6 +85,14 @@ class _SyncPageState extends State<SyncPage> {
             return ar ? 'رمز المحل مختلف بين الهاتفين.' : 'The shop code differs between the two phones.';
           case 'CLOCK':
             return ar ? 'وقت الهاتفين مختلف كثيراً، يرجى ضبط الساعة.' : 'The phones\' clocks differ too much. Fix the time.';
+          case 'SEAT_FULL':
+            return ar
+                ? 'بلغ المحل الحد الأقصى لعدد الأجهزة المسموح بها في الترخيص. يحرّر المدير مكان هاتف قديم من صفحة الترخيص.'
+                : 'The shop reached the number of devices its licence allows. The admin can free a place on the licence page.';
+          case 'SEAT_UNLICENSED':
+            return ar
+                ? 'هاتف المدير غير مرخّص حالياً، لذلك لا يمكن تفعيل هذا الهاتف.'
+                : 'The admin phone has no valid licence, so this phone cannot be activated.';
           case 'two-main':
             return ar
                 ? 'يوجد أكثر من هاتف «رئيسي» على الشبكة. يجب إنشاء الرمز على هاتف المدير فقط.'
@@ -423,12 +431,9 @@ class _SyncPageState extends State<SyncPage> {
   Widget build(BuildContext context) {
     final ar = context.l10n.isArabic;
 
-    if (!AppScope.of(context).licenseService.full) {
-      return Scaffold(
-        appBar: AppBar(title: Text(ar ? 'المزامنة بين الأجهزة' : 'Device sync')),
-        body: TrialLockedBody(ar: ar),
-      );
-    }
+    // Without a full licence a phone can only join the main phone: that is
+    // how an employee phone receives its activation.
+    final full = AppScope.of(context).licenseService.full;
 
     return Scaffold(
       appBar: AppBar(title: Text(ar ? 'المزامنة بين الأجهزة' : 'Device sync')),
@@ -484,7 +489,7 @@ class _SyncPageState extends State<SyncPage> {
                   Wrap(
                     spacing: AppSpacing.sm,
                     children: [
-                      if (context.read<AppCubit>().isAdmin)
+                      if (full && context.read<AppCubit>().isAdmin)
                         OutlinedButton(
                           onPressed: _createCode,
                           child: Text(_code == null ? (ar ? 'إنشاء رمز' : 'Create code') : (ar ? 'رمز جديد' : 'New code')),
@@ -496,6 +501,7 @@ class _SyncPageState extends State<SyncPage> {
               ),
             ),
           ),
+          if (full) ...[
           const SizedBox(height: AppSpacing.md),
           Card(
             child: Padding(
@@ -533,6 +539,7 @@ class _SyncPageState extends State<SyncPage> {
             icon: const Icon(Icons.download),
             label: Text(ar ? 'استلام مزامنة' : 'Receive sync'),
           ),
+          ],
           if (_busy) ...[
             const SizedBox(height: AppSpacing.md),
             const LinearProgressIndicator(),

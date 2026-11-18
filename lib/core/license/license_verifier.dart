@@ -10,6 +10,7 @@ class LicensePayload {
     required this.customer,
     required this.expiry,
     required this.issued,
+    this.devices = 1,
   });
 
   final String deviceId;
@@ -18,6 +19,9 @@ class LicensePayload {
   /// Last valid day, or null for an unlimited licence.
   final DateTime? expiry;
   final DateTime? issued;
+
+  /// Number of phones this licence covers (the main phone included).
+  final int devices;
 }
 
 /// Checks licence codes: `QS1.<payload>.<signature>` where the signature is
@@ -39,6 +43,11 @@ class LicenseVerifier {
       result = (result << 8) | BigInt.from(b);
     }
     return result;
+  }
+
+  static int _devices(Object? raw) {
+    final n = raw is int ? raw : int.tryParse('$raw') ?? 1;
+    return n < 1 ? 1 : (n > 500 ? 500 : n);
   }
 
   /// Returns the payload when [token] carries a valid signature for the key
@@ -72,6 +81,7 @@ class LicenseVerifier {
         customer: '${map['c'] ?? ''}',
         expiry: expiry == null ? null : DateTime.tryParse(expiry),
         issued: issued == null ? null : DateTime.tryParse(issued),
+        devices: _devices(map['n']),
       );
     } catch (_) {
       return null;
