@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/models/app_models.dart';
+import '../../../../core/services/bluetooth_printer_service.dart';
 import '../../../../core/services/receipt_pdf_service.dart';
 import '../../../../domain/entities/app_entities.dart';
 import '../../../../domain/repositories/repositories.dart';
@@ -94,11 +95,13 @@ class InvoiceDetailCubit extends Cubit<InvoiceDetailState> {
     this._salesRepository,
     this._settingsRepository,
     this._receiptPdfService,
+    this._bluetoothPrinterService,
   ) : super(const InvoiceDetailState());
 
   final SalesRepository _salesRepository;
   final SettingsRepository _settingsRepository;
   final ReceiptPdfService _receiptPdfService;
+  final BluetoothPrinterService _bluetoothPrinterService;
 
   Future<void> load(int saleId) async {
     emit(
@@ -208,10 +211,32 @@ class InvoiceDetailCubit extends Cubit<InvoiceDetailState> {
         exchangeRate: detail.sale.exchangeRateAtSale,
         taxEnabled: settings.taxEnabled,
         languageCode: settings.language,
+        paperWidthMm: settings.printerPaperWidthMm,
       );
       if (share) {
         await _receiptPdfService.sharePdf(file);
-      } else {
+        emit(state.copyWith(working: false));
+        return;
+      }
+
+      // Print: the paired Bluetooth printer when one is set; if it is off or
+      // refuses, fall back to the phone's normal print dialog.
+      var printed = false;
+      final mac = settings.printerMacAddress;
+      if (mac != null && mac.isNotEmpty) {
+        try {
+          final connected = await _bluetoothPrinterService.connect(mac);
+          if (connected) {
+            printed = await _bluetoothPrinterService.printPdf(
+              file,
+              paperWidthMm: settings.printerPaperWidthMm,
+            );
+          }
+        } catch (_) {
+          printed = false;
+        }
+      }
+      if (!printed) {
         await _receiptPdfService.printPdf(file);
       }
       emit(state.copyWith(working: false));

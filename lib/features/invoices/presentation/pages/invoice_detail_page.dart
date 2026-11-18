@@ -25,6 +25,7 @@ class InvoiceDetailPage extends StatelessWidget {
         deps.salesRepository,
         deps.settingsRepository,
         deps.receiptPdfService,
+        deps.bluetoothPrinterService,
       )..load(saleId),
       child: const _InvoiceDetailView(),
     );

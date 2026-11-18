@@ -1,4 +1,9 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:image/image.dart' as img;
+import 'package:printing/printing.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
@@ -85,6 +90,51 @@ class BluetoothPrinterService {
   Future<void> disconnect() => PrintBluetoothThermal.disconnect;
 
   PaperSize _paperSize(String widthMm) => widthMm == '58' ? PaperSize.mm58 : PaperSize.mm80;
+
+  /// Prints a PDF receipt as a picture (ESC/POS raster). Because the printer
+  /// receives pixels instead of text, any language, font or shaping that
+  /// looks right in the PDF prints exactly the same, with no dependence on
+  /// the printer's code pages. Works on 58 mm (384 dots) and 80 mm (576 dots)
+  /// ESC/POS thermal printers.
+  Future<bool> printPdf(File pdf, {required String paperWidthMm}) async {
+    final targetWidth = paperWidthMm == '58' ? 384 : 576;
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(_paperSize(paperWidthMm), profile);
+    final bytes = <int>[];
+    bytes.addAll(generator.reset());
+
+    final pdfBytes = await pdf.readAsBytes();
+    await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
+      final decoded = img.decodePng(await page.toPng());
+      if (decoded == null) continue;
+
+      // Flatten onto white (transparent pixels would print black).
+      final canvas = img.Image(width: decoded.width, height: decoded.height);
+      img.fill(canvas, color: img.ColorRgb8(255, 255, 255));
+      img.compositeImage(canvas, decoded);
+
+      final scaled = canvas.width == targetWidth
+          ? canvas
+          : img.copyResize(
+              canvas,
+              width: targetWidth,
+              interpolation: img.Interpolation.average,
+            );
+
+      // Send in slices: long receipts in one raster command overflow the
+      // buffer of many printers.
+      const sliceHeight = 240;
+      for (var y = 0; y < scaled.height; y += sliceHeight) {
+        final h = (y + sliceHeight > scaled.height) ? scaled.height - y : sliceHeight;
+        final slice = img.copyCrop(scaled, x: 0, y: y, width: scaled.width, height: h);
+        bytes.addAll(generator.imageRaster(slice, align: PosAlign.left));
+      }
+    }
+    bytes.addAll(generator.feed(3));
+    bytes.addAll(generator.cut());
+
+    return PrintBluetoothThermal.writeBytes(bytes);
+  }
 
   Future<bool> printReceipt({
     required SaleView sale,

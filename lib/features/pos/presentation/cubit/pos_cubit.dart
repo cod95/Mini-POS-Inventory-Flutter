@@ -409,7 +409,9 @@ class PosCubit extends Cubit<PosState> {
         emit(state.copyWith(receiptProcessing: false, error: 'Could not connect to the Bluetooth printer'));
         return;
       }
-      await _bluetoothPrinterService.printReceipt(
+      // Same PDF receipt as share/print, sent as a picture, so Arabic and
+      // English always look identical on paper.
+      final file = await _receiptPdfService.generateReceipt(
         sale: detail.sale,
         items: detail.items,
         storeName: settings.storeName,
@@ -418,9 +420,17 @@ class PosCubit extends Cubit<PosState> {
         footer: settings.receiptFooter,
         currency: settings.currency,
         exchangeRate: settings.exchangeRate,
-        paperWidthMm: settings.printerPaperWidthMm,
+        taxEnabled: settings.taxEnabled,
         languageCode: settings.language,
+        paperWidthMm: settings.printerPaperWidthMm,
       );
+      final ok = await _bluetoothPrinterService.printPdf(
+        file,
+        paperWidthMm: settings.printerPaperWidthMm,
+      );
+      if (!ok) {
+        throw AppException('The printer did not accept the data');
+      }
       emit(state.copyWith(receiptProcessing: false, infoMessage: 'Receipt sent to Bluetooth printer'));
     } catch (e) {
       emit(state.copyWith(receiptProcessing: false, error: e.toString()));

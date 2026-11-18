@@ -87,6 +87,7 @@ class ReceiptPdfService {
     required double exchangeRate,
     required bool taxEnabled,
     String languageCode = 'en',
+    String paperWidthMm = '80',
   }) async {
     final arabicFont = await _loadArabicFont();
     final theme = pw.ThemeData.withFont(
@@ -127,7 +128,7 @@ class ReceiptPdfService {
     final doc = pw.Document(theme: theme);
     doc.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.roll80.copyWith(
+        pageFormat: (paperWidthMm == '58' ? PdfPageFormat.roll57 : PdfPageFormat.roll80).copyWith(
           marginLeft: 8,
           marginRight: 8,
           marginTop: 8,
