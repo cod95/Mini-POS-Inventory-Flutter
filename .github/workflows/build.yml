@@ -23,6 +23,9 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          # Pinned: the last Flutter version this project's Android setup
+          # (Gradle 8.14 / AGP 8.11.1) builds with. Newer stable needs AGP 9.
+          flutter-version: '3.47.5'
           channel: 'stable'
           cache: true
 
@@ -44,7 +47,7 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Build APK
-        run: flutter build apk --release --verbose --android-skip-build-dependency-validation
+        run: flutter build apk --release --verbose
 
       - name: Verify APK
         run: |
