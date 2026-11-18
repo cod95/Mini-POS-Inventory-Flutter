@@ -177,7 +177,16 @@ class LocalAuthRepository implements AuthRepository {
     if (existing.role == UserRole.admin.value && await _activeAdminCount(except: id) == 0) {
       throw AppException('There must be at least one active admin');
     }
-    await (_db.delete(_db.userAccounts)..where((t) => t.id.equals(id))).go();
+    await _db.transaction(() async {
+      await (_db.delete(_db.userAccounts)..where((t) => t.id.equals(id))).go();
+      await _db.into(_db.deletedRecords).insertOnConflictUpdate(
+            DeletedRecordsCompanion.insert(
+              uuid: existing.uuid,
+              kind: const Value('user'),
+              deletedAt: Value(DateTime.now()),
+            ),
+          );
+    });
   }
 
   @override
@@ -317,7 +326,24 @@ class LocalProductRepository implements ProductRepository {
 
   @override
   Future<void> deleteProduct(int id) async {
-    await (_db.delete(_db.products)..where((tbl) => tbl.id.equals(id))).go();
+    await _db.transaction(() async {
+      final row = await (_db.select(_db.products)..where((tbl) => tbl.id.equals(id)))
+          .getSingleOrNull();
+      if (row == null) return;
+      await (_db.delete(_db.products)..where((tbl) => tbl.id.equals(id))).go();
+      final uuid = row.uuid;
+      if (uuid != null) {
+        // Remember the deletion so a sync takes the product away from the
+        // other phones too instead of bringing it back.
+        await _db.into(_db.deletedRecords).insertOnConflictUpdate(
+              DeletedRecordsCompanion.insert(
+                uuid: uuid,
+                kind: const Value('product'),
+                deletedAt: Value(DateTime.now()),
+              ),
+            );
+      }
+    });
   }
 
   @override

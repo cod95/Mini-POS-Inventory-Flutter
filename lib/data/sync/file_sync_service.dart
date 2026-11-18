@@ -20,71 +20,101 @@ class SyncImportResult {
   int newSales = 0;
   int updatedSales = 0;
   int appliedMovements = 0;
+  int deleted = 0;
   int usersChanged = 0;
   bool settingsApplied = false;
   String? assignedDeviceCode;
   String senderName = '';
   final List<String> warnings = [];
+
+  /// True when the import changed something on this phone.
+  bool get changedAnything =>
+      newProducts + updatedProducts + newSales + updatedSales + appliedMovements + deleted + usersChanged > 0 ||
+      settingsApplied;
 }
 
-/// Syncs two phones through a file (sent over WhatsApp, Bluetooth, USB…).
+/// The sync engine shared by file sync and Wi-Fi sync.
 ///
-/// The file holds the sender's products, every sale/return with its items and
-/// every stock movement (each with a unique id). Importing it is safe to do
-/// any number of times: rows already known are skipped, new sales and stock
-/// movements are added, price edits follow the latest change, and a sale's
-/// status (returned / cancelled) only moves forward.
+/// A package holds products, stock movements (each with a unique id), sales
+/// with their items and deletions. Importing is safe any number of times:
+/// rows already known are skipped, stock movements are applied once ever,
+/// price edits follow the latest change (ties are broken the same way on
+/// both phones) and a sale's status only moves forward.
+///
+/// The main phone is the hub: only it sends users and store settings, and a
+/// main phone never accepts them from anyone.
 class FileSyncService {
   FileSyncService(this._db);
 
   final AppDatabase _db;
 
   static const String _format = 'quickstock-sync';
-  static const int _version = 2;
+  static const int _version = 3;
 
   // ------------------------------------------------------------- shop code
 
   Future<String?> getSyncCode() async {
-    final row = await _settings();
+    final row = await settings();
     final code = row.syncCode;
     return (code == null || code.isEmpty) ? null : SyncCrypto.pretty(code);
   }
 
-  /// Creates a new random shop code (main phone) and stores it.
+  /// Creates a new random shop code and makes this phone the main phone.
   Future<String> createSyncCode() async {
     final code = SyncCrypto.generateCode();
-    await _storeSyncCode(code);
+    await settings();
+    await (_db.update(_db.appSettings)..where((t) => t.id.equals(1))).write(
+      AppSettingsCompanion(syncCode: Value(code), isMainDevice: const Value(true)),
+    );
     return code;
   }
 
-  /// Stores the code typed in from the main phone. Throws FormatException
-  /// when it does not look like a shop code.
+  /// Stores the code typed in from the main phone (this phone is then an
+  /// employee phone). Throws FormatException when it is not a shop code.
   Future<void> setSyncCode(String code) async {
     if (!SyncCrypto.isValidCode(code)) throw const FormatException('BAD_CODE');
-    await _storeSyncCode(SyncCrypto.pretty(code));
-  }
-
-  Future<void> _storeSyncCode(String code) async {
-    await _settings();
+    await settings();
     await (_db.update(_db.appSettings)..where((t) => t.id.equals(1))).write(
-      AppSettingsCompanion(syncCode: Value(code)),
+      AppSettingsCompanion(syncCode: Value(SyncCrypto.pretty(code)), isMainDevice: const Value(false)),
     );
   }
 
-  Future<Uint8List> _key() async {
+  /// Automatic sync on/off and the typed address of the main phone.
+  Future<void> updateSyncOptions({bool? autoSync, String? hubAddress, bool clearHubAddress = false}) async {
+    await settings();
+    await (_db.update(_db.appSettings)..where((t) => t.id.equals(1))).write(
+      AppSettingsCompanion(
+        autoSync: autoSync == null ? const Value.absent() : Value(autoSync),
+        hubAddress: clearHubAddress
+            ? const Value(null)
+            : (hubAddress == null ? const Value.absent() : Value(hubAddress.trim())),
+      ),
+    );
+  }
+
+  Future<Uint8List> key() async {
     final code = await getSyncCode();
     if (code == null) throw const FormatException('NO_SYNC_CODE');
     return SyncCrypto.deriveKey(code);
   }
 
-  // ----------------------------------------------------------------- export
+  Future<AppSetting> settings() async {
+    final row = await (_db.select(_db.appSettings)..where((t) => t.id.equals(1))).getSingle();
+    if (row.deviceId != null && row.deviceId!.isNotEmpty) return row;
+    await (_db.update(_db.appSettings)..where((t) => t.id.equals(1))).write(
+      AppSettingsCompanion(deviceId: Value(newUuid())),
+    );
+    return (_db.select(_db.appSettings)..where((t) => t.id.equals(1))).getSingle();
+  }
 
-  Future<File> exportToFile({required bool includeAdminData}) async {
-    final key = await _key();
-    final data = await _buildPackage(includeAdminData: includeAdminData);
+  // ------------------------------------------------------------- file sync
+
+  Future<File> exportToFile() async {
+    final k = await key();
+    final data = await buildPackage();
     final json = Uint8List.fromList(utf8.encode(jsonEncode(data)));
     final encrypted = await Isolate.run(
-      () => SyncCrypto.encryptSync(Uint8List.fromList(gzip.encode(json)), key),
+      () => SyncCrypto.encryptSync(Uint8List.fromList(gzip.encode(json)), k),
     );
     final bytes = <int>[...SyncCrypto.magic, ...encrypted];
 
@@ -100,42 +130,92 @@ class FileSyncService {
 
   Future<void> shareFile(File file) => Share.shareXFiles([XFile(file.path)]);
 
-  Future<AppSetting> _settings() async {
-    final row = await (_db.select(_db.appSettings)..where((t) => t.id.equals(1))).getSingle();
-    if (row.deviceId != null && row.deviceId!.isNotEmpty) return row;
-    await (_db.update(_db.appSettings)..where((t) => t.id.equals(1))).write(
-      AppSettingsCompanion(deviceId: Value(newUuid())),
-    );
-    return (_db.select(_db.appSettings)..where((t) => t.id.equals(1))).getSingle();
+  Future<SyncImportResult> importFromFile(File file) async {
+    final raw = await file.readAsBytes();
+    if (!SyncCrypto.hasMagic(raw)) {
+      throw const FormatException('NOT_A_SYNC_FILE');
+    }
+    final k = await key();
+    final Map<String, dynamic> data;
+    try {
+      final body = Uint8List.sublistView(raw, SyncCrypto.magic.length);
+      final plain = await Isolate.run(
+        () => Uint8List.fromList(gzip.decode(SyncCrypto.decryptSync(body, k))),
+      );
+      data = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
+    } on SyncDecryptException {
+      throw const FormatException('WRONG_CODE');
+    } catch (_) {
+      throw const FormatException('NOT_A_SYNC_FILE');
+    }
+    if (data['format'] != _format) {
+      throw const FormatException('NOT_A_SYNC_FILE');
+    }
+    return importPackage(data);
   }
+
+  // --------------------------------------------------------------- package
 
   static String _date(DateTime d) => d.toUtc().toIso8601String();
 
-  Future<Map<String, dynamic>> _buildPackage({required bool includeAdminData}) async {
-    final settings = await _settings();
+  /// Everything that changed on this phone since [since] (everything when
+  /// null). The main phone also adds users and store settings.
+  Future<Map<String, dynamic>> buildPackage({DateTime? since}) async {
+    final mine = await settings();
+    // A little overlap: rows are de-duplicated on arrival.
+    final from = since?.subtract(const Duration(seconds: 5));
+
     final categories = await _db.select(_db.categories).get();
     final categoryName = {for (final c in categories) c.id: c.name};
-    final products = await _db.select(_db.products).get();
-    final productUuid = {for (final p in products) p.id: p.uuid};
-    final movements = await _db.select(_db.stockMovements).get();
-    final sales = await _db.select(_db.sales).get();
-    final items = await _db.select(_db.saleItems).get();
+    final allProducts = await _db.select(_db.products).get();
+    final productUuid = {for (final p in allProducts) p.id: p.uuid};
 
-    final saleUuid = {for (final s in sales) s.id: s.uuid};
-    final itemUuid = {for (final i in items) i.id: i.uuid};
-    final itemsBySale = <int, List<SaleItem>>{};
-    for (final item in items) {
-      itemsBySale.putIfAbsent(item.saleId, () => []).add(item);
+    final products = from == null
+        ? allProducts
+        : allProducts.where((p) => p.changedAt == null || !p.changedAt!.isBefore(from)).toList();
+
+    final movementQuery = _db.select(_db.stockMovements);
+    if (from != null) {
+      movementQuery.where((t) => t.changedAt.isBiggerOrEqualValue(from) | t.changedAt.isNull());
     }
+    final movements = await movementQuery.get();
+
+    final salesQuery = _db.select(_db.sales);
+    if (from != null) {
+      salesQuery.where((t) => t.changedAt.isBiggerOrEqualValue(from) | t.changedAt.isNull());
+    }
+    final sales = await salesQuery.get();
+    final allSales = from == null ? sales : await _db.select(_db.sales).get();
+    final saleUuid = {for (final s in allSales) s.id: s.uuid};
+
+    final saleIds = sales.map((s) => s.id).toSet();
+    final allItems = await _db.select(_db.saleItems).get();
+    final itemUuid = {for (final i in allItems) i.id: i.uuid};
+    final itemsBySale = <int, List<SaleItem>>{};
+    for (final item in allItems) {
+      if (saleIds.contains(item.saleId)) {
+        itemsBySale.putIfAbsent(item.saleId, () => []).add(item);
+      }
+    }
+
+    final deletedQuery = _db.select(_db.deletedRecords);
+    if (from != null) {
+      deletedQuery.where((t) => t.deletedAt.isBiggerOrEqualValue(from));
+    }
+    final deleted = await deletedQuery.get();
 
     final data = <String, dynamic>{
       'format': _format,
       'version': _version,
-      'deviceId': settings.deviceId,
-      'deviceCode': settings.deviceCode,
-      'storeName': settings.storeName,
+      'deviceId': mine.deviceId,
+      'deviceCode': mine.deviceCode,
+      'storeName': mine.storeName,
       'exportedAt': _date(DateTime.now()),
+      'full': since == null,
       'categories': categories.map((c) => c.name).toList(),
+      'deleted': [
+        for (final d in deleted) {'uuid': d.uuid, 'kind': d.kind, 'at': _date(d.deletedAt)},
+      ],
       'products': [
         for (final p in products)
           {
@@ -156,14 +236,15 @@ class FileSyncService {
       ],
       'movements': [
         for (final m in movements)
-          {
-            'uuid': m.uuid,
-            'productUuid': productUuid[m.productId],
-            'type': m.type,
-            'qtyChange': m.qtyChange,
-            'reason': m.reason,
-            'createdAt': _date(m.createdAt),
-          },
+          if (productUuid[m.productId] != null)
+            {
+              'uuid': m.uuid,
+              'productUuid': productUuid[m.productId],
+              'type': m.type,
+              'qtyChange': m.qtyChange,
+              'reason': m.reason,
+              'createdAt': _date(m.createdAt),
+            },
       ],
       'sales': [
         for (final s in sales)
@@ -203,7 +284,7 @@ class FileSyncService {
       ],
     };
 
-    if (includeAdminData) {
+    if (mine.isMainDevice) {
       final users = await _db.select(_db.userAccounts).get();
       data['fromAdmin'] = true;
       data['users'] = [
@@ -218,16 +299,16 @@ class FileSyncService {
           },
       ];
       data['settings'] = {
-        'storeName': settings.storeName,
-        'storePhone': settings.storePhone,
-        'currency': settings.currency,
-        'secondaryCurrencyCode': settings.secondaryCurrencyCode,
-        'exchangeRate': settings.exchangeRate,
-        'taxEnabled': settings.taxEnabled,
-        'taxRate': settings.taxRate,
-        'receiptHeader': settings.receiptHeader,
-        'receiptFooter': settings.receiptFooter,
-        'allowNegativeStock': settings.allowNegativeStock,
+        'storeName': mine.storeName,
+        'storePhone': mine.storePhone,
+        'currency': mine.currency,
+        'secondaryCurrencyCode': mine.secondaryCurrencyCode,
+        'exchangeRate': mine.exchangeRate,
+        'taxEnabled': mine.taxEnabled,
+        'taxRate': mine.taxRate,
+        'receiptHeader': mine.receiptHeader,
+        'receiptFooter': mine.receiptFooter,
+        'allowNegativeStock': mine.allowNegativeStock,
       };
     }
     return data;
@@ -235,33 +316,23 @@ class FileSyncService {
 
   // ----------------------------------------------------------------- import
 
-  Future<SyncImportResult> importFromFile(File file) async {
-    final raw = await file.readAsBytes();
-    if (!SyncCrypto.hasMagic(raw)) {
-      throw const FormatException('NOT_A_SYNC_FILE');
-    }
-    final key = await _key();
-    final Map<String, dynamic> data;
-    try {
-      final body = Uint8List.sublistView(raw, SyncCrypto.magic.length);
-      final plain = await Isolate.run(
-        () => Uint8List.fromList(gzip.decode(SyncCrypto.decryptSync(body, key))),
-      );
-      data = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
-    } on SyncDecryptException {
-      throw const FormatException('WRONG_CODE');
-    } catch (_) {
-      throw const FormatException('NOT_A_SYNC_FILE');
-    }
-    if (data['format'] != _format) {
-      throw const FormatException('NOT_A_SYNC_FILE');
-    }
-    return _import(data);
+  static DateTime _parse(Object? v) => DateTime.tryParse('$v')?.toLocal() ?? DateTime.now();
+
+  /// A clock that runs far ahead must not win every price conflict.
+  static DateTime _parseEdit(Object? v) {
+    final parsed = _parse(v);
+    final limit = DateTime.now().add(const Duration(minutes: 10));
+    return parsed.isAfter(limit) ? limit : parsed;
   }
 
   static bool _isDefaultSecret(String secret) => secret == 'admin123' || secret == '1234';
 
-  static DateTime _parse(Object? v) => DateTime.tryParse('$v')?.toLocal() ?? DateTime.now();
+  /// Same answer on both phones, so a tie never leaves them different.
+  static bool _incomingWins(DateTime incoming, DateTime local, String senderId, String myId) {
+    if (incoming.isAfter(local)) return true;
+    if (incoming.isBefore(local)) return false;
+    return senderId.compareTo(myId) > 0;
+  }
 
   static const Map<String, int> _statusRank = {
     'completed': 0,
@@ -270,15 +341,18 @@ class FileSyncService {
     'cancelled': 3,
   };
 
-  Future<SyncImportResult> _import(Map<String, dynamic> data) {
+  Future<SyncImportResult> importPackage(Map<String, dynamic> data) {
     return _db.transaction(() async {
       final result = SyncImportResult()..senderName = '${data['storeName'] ?? ''}';
-      final mySettings = await _settings();
+      final mine = await settings();
+      final senderId = '${data['deviceId'] ?? ''}';
+      final myId = mine.deviceId ?? '';
       final senderCode = '${data['deviceCode'] ?? ''}';
+      final senderIsMain = data['fromAdmin'] == true;
+      final now = DateTime.now();
 
-      // ---- device code so the two phones never issue the same number
-      if (data['deviceId'] != mySettings.deviceId &&
-          (mySettings.deviceCode == senderCode)) {
+      // ---- device code so two phones never issue the same invoice number
+      if (senderId != myId && mine.deviceCode == senderCode) {
         final random = Random();
         final code = 'D${10 + random.nextInt(90)}';
         await (_db.update(_db.appSettings)..where((t) => t.id.equals(1))).write(
@@ -287,19 +361,81 @@ class FileSyncService {
         result.assignedDeviceCode = code;
       }
 
-      // ---- users + store settings (admin packages only)
-      if (data['fromAdmin'] == true) {
+      // ---- deletions (own and received)
+      final tombstones = <String, DateTime>{
+        for (final d in await _db.select(_db.deletedRecords).get()) d.uuid: d.deletedAt,
+      };
+      for (final raw in (data['deleted'] as List? ?? const [])) {
+        final d = raw as Map<String, dynamic>;
+        final uuid = '${d['uuid']}';
+        final kind = '${d['kind']}';
+        final at = _parse(d['at']);
+        if (kind == 'user' && !(senderIsMain && !mine.isMainDevice)) continue;
+        final known = tombstones[uuid];
+        if (known == null || at.isAfter(known)) {
+          await _db.into(_db.deletedRecords).insertOnConflictUpdate(
+                DeletedRecordsCompanion.insert(
+                  uuid: uuid,
+                  kind: Value(kind),
+                  deletedAt: Value(at),
+                ),
+              );
+          tombstones[uuid] = at;
+        }
+        if (kind == 'product') {
+          final local = await (_db.select(_db.products)..where((t) => t.uuid.equals(uuid)))
+              .getSingleOrNull();
+          if (local != null && !(local.catalogUpdatedAt ?? local.updatedAt).isAfter(at)) {
+            await (_db.delete(_db.products)..where((t) => t.id.equals(local.id))).go();
+            result.deleted++;
+          }
+        } else if (kind == 'user') {
+          final local = await (_db.select(_db.userAccounts)..where((t) => t.uuid.equals(uuid)))
+              .getSingleOrNull();
+          if (local != null) {
+            final admins = await (_db.select(_db.userAccounts)
+                  ..where((t) => t.role.equals('admin') & t.active.equals(true)))
+                .get();
+            final lastAdmin = local.role == 'admin' && admins.every((a) => a.id == local.id);
+            if (!lastAdmin) {
+              await (_db.delete(_db.userAccounts)..where((t) => t.id.equals(local.id))).go();
+              result.usersChanged++;
+            }
+          }
+        }
+      }
+
+      // ---- users + store settings: only the main phone sends them and the
+      // main phone never accepts them.
+      if (senderIsMain && !mine.isMainDevice) {
+        final localUsers = await _db.select(_db.userAccounts).get();
+        final usedNames = {for (final u in localUsers) u.name.toLowerCase(): u.uuid};
         for (final raw in (data['users'] as List? ?? const [])) {
           final u = raw as Map<String, dynamic>;
           final uuid = '${u['uuid']}';
+          if (tombstones.containsKey(uuid)) continue;
           final existing = await (_db.select(_db.userAccounts)..where((t) => t.uuid.equals(uuid)))
               .getSingleOrNull();
-          final incomingAt = _parse(u['updatedAt']);
+          final incomingAt = _parseEdit(u['updatedAt']);
+
+          String uniqueName(String wanted) {
+            var candidate = wanted;
+            var n = 2;
+            while (usedNames[candidate.toLowerCase()] != null &&
+                usedNames[candidate.toLowerCase()] != uuid) {
+              candidate = '$wanted ($n)';
+              n++;
+            }
+            return candidate;
+          }
+
           if (existing == null) {
+            final name = uniqueName('${u['name']}');
+            usedNames[name.toLowerCase()] = uuid;
             await _db.into(_db.userAccounts).insert(
                   UserAccountsCompanion.insert(
                     uuid: uuid,
-                    name: '${u['name']}',
+                    name: name,
                     role: '${u['role']}',
                     secret: '${u['secret']}',
                     mustChangeSecret: Value(_isDefaultSecret('${u['secret']}')),
@@ -308,10 +444,13 @@ class FileSyncService {
                   ),
                 );
             result.usersChanged++;
-          } else if (incomingAt.isAfter(existing.updatedAt)) {
+          } else if (_incomingWins(incomingAt, existing.updatedAt, senderId, myId) &&
+              (incomingAt != existing.updatedAt || '${u['secret']}' != existing.secret)) {
+            final name = uniqueName('${u['name']}');
+            usedNames[name.toLowerCase()] = uuid;
             await (_db.update(_db.userAccounts)..where((t) => t.id.equals(existing.id))).write(
               UserAccountsCompanion(
-                name: Value('${u['name']}'),
+                name: Value(name),
                 role: Value('${u['role']}'),
                 secret: Value('${u['secret']}'),
                 mustChangeSecret: Value(_isDefaultSecret('${u['secret']}')),
@@ -361,73 +500,144 @@ class FileSyncService {
       // ---- products
       final localProducts = await _db.select(_db.products).get();
       final byUuid = {for (final p in localProducts) if (p.uuid != null) p.uuid!: p};
-      final bySku = {for (final p in localProducts) p.sku.toLowerCase(): p};
-      final byBarcode = {
+      final skuOwner = {for (final p in localProducts) p.sku.toLowerCase(): p.id};
+      final barcodeOwner = {
         for (final p in localProducts)
-          if ((p.barcode ?? '').isNotEmpty) p.barcode!.toLowerCase(): p,
+          if ((p.barcode ?? '').isNotEmpty) p.barcode!.toLowerCase(): p.id,
       };
-      final byName = {for (final p in localProducts) p.name.toLowerCase(): p};
+      final nameOwner = {for (final p in localProducts) p.name.toLowerCase(): p.id};
+      final productsById = {for (final p in localProducts) p.id: p};
 
-      final productIdByUuid = <String, int>{};
-      // Products first seen in this package take the sender's stock as their
-      // starting point; their movements in this package are already inside it.
+      // Every local product is reachable by its uuid, even when it is not in
+      // this package (its stock movements may be).
+      final productIdByUuid = <String, int>{
+        for (final p in localProducts) if (p.uuid != null) p.uuid!: p.id,
+      };
+      // Products first seen (or linked) in this package: their movements in
+      // this package are already inside the stock figure that came with them.
       final baselineProducts = <String>{};
+
+      String freeSku(String sku, int? ownId, String uuid) {
+        final owner = skuOwner[sku.toLowerCase()];
+        if (owner == null || owner == ownId) return sku;
+        final short = uuid.length >= 4 ? uuid.substring(0, 4) : uuid;
+        var candidate = '$sku-$short';
+        var n = 2;
+        while (skuOwner.containsKey(candidate.toLowerCase())) {
+          candidate = '$sku-$short$n';
+          n++;
+        }
+        return candidate;
+      }
+
+      String? freeBarcode(String? barcode, int? ownId) {
+        if (barcode == null || barcode.isEmpty) return null;
+        final owner = barcodeOwner[barcode.toLowerCase()];
+        if (owner == null || owner == ownId) return barcode;
+        return null;
+      }
+
+      bool sameCatalog(Product local, Map<String, dynamic> p) =>
+          local.name == '${p['name']}' &&
+          local.sku == '${p['sku']}' &&
+          (local.barcode ?? '') == ((p['barcode'] as String?)?.trim() ?? '') &&
+          local.cost == (p['cost'] as num).toDouble() &&
+          local.price == (p['price'] as num).toDouble() &&
+          local.lowStockThreshold == (p['lowStockThreshold'] as num).toInt() &&
+          local.unit == '${p['unit']}' &&
+          (local.notes ?? '') == ((p['notes'] as String?) ?? '') &&
+          local.taxable == (p['taxable'] == true);
 
       for (final raw in (data['products'] as List? ?? const [])) {
         final p = raw as Map<String, dynamic>;
         final uuid = '${p['uuid']}';
         final name = '${p['name']}';
-        final sku = '${p['sku']}';
-        final barcode = (p['barcode'] as String?)?.trim();
-        final incomingAt = _parse(p['catalogUpdatedAt']);
-        final catId = await categoryId(p['category'] as String?);
+        final wantedSku = '${p['sku']}';
+        final wantedBarcode = (p['barcode'] as String?)?.trim();
+        final incomingAt = _parseEdit(p['catalogUpdatedAt']);
 
-        ProductsCompanion catalog({bool withStock = false}) => ProductsCompanion(
-              name: Value(name),
-              sku: Value(sku),
-              barcode: Value((barcode == null || barcode.isEmpty) ? null : barcode),
-              categoryId: Value(catId),
-              cost: Value((p['cost'] as num).toDouble()),
-              price: Value((p['price'] as num).toDouble()),
-              lowStockThreshold: Value((p['lowStockThreshold'] as num).toInt()),
-              unit: Value('${p['unit']}'),
-              notes: Value(p['notes'] as String?),
-              taxable: Value(p['taxable'] == true),
-              catalogUpdatedAt: Value(incomingAt),
-              updatedAt: Value(DateTime.now()),
-              stockQty: withStock ? Value((p['stockQty'] as num).toInt()) : const Value.absent(),
-            );
+        final deletedAt = tombstones[uuid];
+        if (deletedAt != null && !incomingAt.isAfter(deletedAt)) continue;
 
         try {
+          final catId = await categoryId(p['category'] as String?);
           final local = byUuid[uuid];
+
           if (local != null) {
-            productIdByUuid[uuid] = local.id;
             final localAt = local.catalogUpdatedAt ?? local.updatedAt;
-            if (incomingAt.isAfter(localAt)) {
-              await (_db.update(_db.products)..where((t) => t.id.equals(local.id))).write(catalog());
+            if (_incomingWins(incomingAt, localAt, senderId, myId) && !sameCatalog(local, p)) {
+              final sku = freeSku(wantedSku, local.id, uuid);
+              final barcode = freeBarcode(wantedBarcode, local.id);
+              await (_db.update(_db.products)..where((t) => t.id.equals(local.id))).write(
+                ProductsCompanion(
+                  name: Value(name),
+                  sku: Value(sku),
+                  barcode: Value(barcode),
+                  categoryId: Value(catId),
+                  cost: Value((p['cost'] as num).toDouble()),
+                  price: Value((p['price'] as num).toDouble()),
+                  lowStockThreshold: Value((p['lowStockThreshold'] as num).toInt()),
+                  unit: Value('${p['unit']}'),
+                  notes: Value(p['notes'] as String?),
+                  taxable: Value(p['taxable'] == true),
+                  catalogUpdatedAt: Value(incomingAt),
+                  updatedAt: Value(now),
+                ),
+              );
+              skuOwner.remove(local.sku.toLowerCase());
+              skuOwner[sku.toLowerCase()] = local.id;
+              if ((local.barcode ?? '').isNotEmpty) barcodeOwner.remove(local.barcode!.toLowerCase());
+              if (barcode != null) barcodeOwner[barcode.toLowerCase()] = local.id;
+              if (sku != wantedSku || barcode != wantedBarcode && (wantedBarcode ?? '').isNotEmpty) {
+                result.warnings.add('"$name": SKU/barcode already used by another product, adjusted');
+              }
               result.updatedProducts++;
             }
             continue;
           }
 
-          final match = bySku[sku.toLowerCase()] ??
-              ((barcode ?? '').isNotEmpty ? byBarcode[barcode!.toLowerCase()] : null) ??
-              byName[name.toLowerCase()];
+          // Not known by uuid: the same product typed in on both phones?
+          final matchId = skuOwner[wantedSku.toLowerCase()] ??
+              ((wantedBarcode ?? '').isNotEmpty ? barcodeOwner[wantedBarcode!.toLowerCase()] : null) ??
+              nameOwner[name.toLowerCase()];
+          final match = matchId == null ? null : productsById[matchId];
 
           if (match != null) {
-            // Same product created separately on each phone: link them.
+            final sku = freeSku(wantedSku, match.id, uuid);
+            final barcode = freeBarcode(wantedBarcode, match.id);
             await (_db.update(_db.products)..where((t) => t.id.equals(match.id))).write(
-              catalog(withStock: true).copyWith(uuid: Value(uuid)),
+              ProductsCompanion(
+                name: Value(name),
+                sku: Value(sku),
+                barcode: Value(barcode),
+                categoryId: Value(catId),
+                cost: Value((p['cost'] as num).toDouble()),
+                price: Value((p['price'] as num).toDouble()),
+                lowStockThreshold: Value((p['lowStockThreshold'] as num).toInt()),
+                unit: Value('${p['unit']}'),
+                notes: Value(p['notes'] as String?),
+                taxable: Value(p['taxable'] == true),
+                catalogUpdatedAt: Value(incomingAt),
+                updatedAt: Value(now),
+                uuid: Value(uuid),
+                // The main phone's stock is the truth; an employee phone's
+                // figure never overwrites the main phone's.
+                stockQty: senderIsMain ? Value((p['stockQty'] as num).toInt()) : const Value.absent(),
+              ),
             );
+            skuOwner.remove(match.sku.toLowerCase());
+            skuOwner[sku.toLowerCase()] = match.id;
             productIdByUuid[uuid] = match.id;
             baselineProducts.add(uuid);
             result.updatedProducts++;
           } else {
+            final sku = freeSku(wantedSku, null, uuid);
+            final barcode = freeBarcode(wantedBarcode, null);
             final id = await _db.into(_db.products).insert(
                   ProductsCompanion.insert(
                     name: name,
                     sku: sku,
-                    barcode: Value((barcode == null || barcode.isEmpty) ? null : barcode),
+                    barcode: Value(barcode),
                     categoryId: Value(catId),
                     cost: (p['cost'] as num).toDouble(),
                     price: (p['price'] as num).toDouble(),
@@ -440,9 +650,15 @@ class FileSyncService {
                     uuid: Value(uuid),
                   ),
                 );
+            skuOwner[sku.toLowerCase()] = id;
+            if (barcode != null) barcodeOwner[barcode.toLowerCase()] = id;
+            nameOwner[name.toLowerCase()] = id;
             productIdByUuid[uuid] = id;
             baselineProducts.add(uuid);
             result.newProducts++;
+            if (sku != wantedSku) {
+              result.warnings.add('"$name": SKU $wantedSku already used by another product, now $sku');
+            }
           }
         } catch (e) {
           result.warnings.add('Product "$name": $e');
@@ -552,10 +768,7 @@ class FileSyncService {
 
         for (final rawItem in (s['items'] as List? ?? const [])) {
           final i = rawItem as Map<String, dynamic>;
-          final productId = productIdByUuid['${i['productUuid']}'] ??
-              (await (_db.select(_db.products)..where((t) => t.uuid.equals('${i['productUuid']}')))
-                      .getSingleOrNull())
-                  ?.id;
+          final productId = productIdByUuid['${i['productUuid']}'];
           if (productId == null) {
             result.warnings.add('Invoice $invoiceNo: product "${i['name']}" not found, line skipped');
             continue;
@@ -585,7 +798,7 @@ class FileSyncService {
       }
 
       // Return documents point at their original sale/item (second pass so
-      // the order inside the file does not matter).
+      // the order inside the package does not matter).
       for (final link in newLinks) {
         final originalUuid = link.originalSaleUuid;
         if (originalUuid == null) continue;

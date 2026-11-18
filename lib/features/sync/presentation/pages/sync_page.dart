@@ -10,6 +10,7 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/state/app_cubit.dart';
 import '../../../../data/sync/file_sync_service.dart';
+import '../../../../data/sync/lan_sync_service.dart';
 
 /// Admin: send this phone's data to the other phone, or receive the other
 /// phone's file. Works through any file channel (WhatsApp, Bluetooth, USB).
@@ -26,6 +27,10 @@ class _SyncPageState extends State<SyncPage> {
   bool _isError = false;
   String? _code;
   bool _codeLoaded = false;
+  bool _isMain = false;
+  bool _autoSync = true;
+  String _hubAddress = '';
+  List<String> _addresses = const [];
 
   bool get _ar => context.l10n.isArabic;
 
@@ -39,8 +44,203 @@ class _SyncPageState extends State<SyncPage> {
   }
 
   Future<void> _loadCode() async {
-    final code = await AppScope.of(context).fileSyncService.getSyncCode();
-    if (mounted) setState(() => _code = code);
+    final deps = AppScope.of(context);
+    final code = await deps.fileSyncService.getSyncCode();
+    final row = await deps.fileSyncService.settings();
+    final addresses = await deps.lanSyncService.localAddresses();
+    if (!mounted) return;
+    setState(() {
+      _code = code;
+      _isMain = row.isMainDevice;
+      _autoSync = row.autoSync;
+      _hubAddress = row.hubAddress ?? '';
+      _addresses = addresses;
+    });
+  }
+
+  String _statusText(LanSyncStatus st) {
+    final ar = _ar;
+    switch (st.state) {
+      case 'off':
+        return ar
+            ? 'متوقفة. حط رمز المحل وفعّل المزامنة التلقائية.'
+            : 'Off. Set the shop code and turn automatic sync on.';
+      case 'searching':
+        return ar ? 'عم دوّر على تلفون الأدمن على نفس الشبكة…' : 'Looking for the admin phone on this network…';
+      case 'syncing':
+        return ar ? 'عم تزامن…' : 'Syncing…';
+      case 'connected':
+        if (_isMain) {
+          return ar ? 'جاهز. التلفونات التانية بتتصل لحالها.' : 'Ready. The other phones connect by themselves.';
+        }
+        return ar ? 'متصل بـ ${st.peerName ?? 'الأدمن'}' : 'Connected to ${st.peerName ?? 'admin'}';
+      default:
+        switch (st.error) {
+          case 'UNREACHABLE':
+            return ar
+                ? 'ما قدرت اتصل بتلفون الأدمن. تأكد إن التطبيق مفتوح عندو وإنكن على نفس الواي فاي.'
+                : 'Cannot reach the admin phone. Make sure the app is open there and both are on the same Wi-Fi.';
+          case 'WRONG_CODE':
+            return ar ? 'رمز المحل مختلف بين التلفونين.' : 'The shop code differs between the two phones.';
+          case 'CLOCK':
+            return ar ? 'وقت التلفونين مختلف كتير، صحّح الساعة.' : 'The phones\' clocks differ too much. Fix the time.';
+          case 'two-main':
+            return ar
+                ? 'في أكتر من تلفون "رئيسي" على الشبكة. الرمز بينعمل على تلفون الأدمن بس.'
+                : 'More than one main phone is on the network. Only the admin phone should create the code.';
+          default:
+            return st.error ?? '';
+        }
+    }
+  }
+
+  Future<void> _syncNow() async {
+    final deps = AppScope.of(context);
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    final error = await deps.lanSyncService.syncNow();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _isError = error != null;
+      _message = error == null
+          ? (_ar ? 'تمت المزامنة.' : 'Synced.')
+          : _statusText(deps.lanSyncService.status.value.copyWith(state: 'error', error: error));
+    });
+  }
+
+  Future<void> _editHubAddress() async {
+    final deps = AppScope.of(context);
+    final controller = TextEditingController(text: _hubAddress);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_ar ? 'عنوان تلفون الأدمن' : 'Admin phone address'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            hintText: '192.168.1.20',
+            helperText: _ar
+                ? 'بس إذا ما لقاه لحالو. بيظهر على تلفون الأدمن بنفس هالشاشة.'
+                : 'Only if it is not found by itself. Shown on the admin phone in this screen.',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(_ar ? 'إلغاء' : 'Cancel')),
+          FilledButton(
+            onPressed: () async {
+              final value = controller.text.trim();
+              await deps.fileSyncService
+                  .updateSyncOptions(hubAddress: value, clearHubAddress: value.isEmpty);
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            },
+            child: Text(_ar ? 'حفظ' : 'Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    await _loadCode();
+  }
+
+  Widget _autoCard(BuildContext context) {
+    final deps = AppScope.of(context);
+    final ar = _ar;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: ValueListenableBuilder<LanSyncStatus>(
+          valueListenable: deps.lanSyncService.status,
+          builder: (context, st, _) {
+            final isError = st.state == 'error';
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.wifi),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        ar ? 'المزامنة التلقائية (واي فاي)' : 'Automatic sync (Wi-Fi)',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _autoSync,
+                      onChanged: (value) async {
+                        await deps.fileSyncService.updateSyncOptions(autoSync: value);
+                        await _loadCode();
+                      },
+                    ),
+                  ],
+                ),
+                Text(
+                  _code == null
+                      ? (ar ? 'حط رمز المحل أول شي.' : 'Set the shop code first.')
+                      : (_isMain
+                          ? (ar ? 'هيدا تلفون الأدمن (الرئيسي).' : 'This is the admin (main) phone.')
+                          : (ar ? 'هيدا تلفون موظف.' : 'This is an employee phone.')),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  _statusText(st),
+                  style: TextStyle(
+                    color: isError ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                if (st.lastSyncAt != null)
+                  Text(
+                    ar
+                        ? 'آخر مزامنة: ${TimeOfDay.fromDateTime(st.lastSyncAt!).format(context)}'
+                        : 'Last sync: ${TimeOfDay.fromDateTime(st.lastSyncAt!).format(context)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                if (_isMain && _addresses.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    ar ? 'عنوان هالتلفون: ${_addresses.join('  ،  ')}' : 'This phone\'s address: ${_addresses.join(', ')}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  ar
+                      ? 'بتشتغل والتطبيق مفتوح على التلفونين وعلى نفس الشبكة. المبيعات بتروح للأدمن، والأسعار والمنتجات والمستخدمين بتوصل للموظف.'
+                      : 'Works while the app is open on both phones and they share a network. Sales go to the admin; prices, products and users come back.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (!_isMain && _code != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: _busy ? null : _syncNow,
+                        icon: const Icon(Icons.sync),
+                        label: Text(ar ? 'زامن هلأ' : 'Sync now'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _editHubAddress,
+                        child: Text(
+                          _hubAddress.isEmpty
+                              ? (ar ? 'إدخال العنوان يدوياً' : 'Enter address manually')
+                              : (ar ? 'العنوان: $_hubAddress' : 'Address: $_hubAddress'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _createCode() async {
@@ -132,8 +332,7 @@ class _SyncPageState extends State<SyncPage> {
       _message = null;
     });
     try {
-      final isAdmin = context.read<AppCubit>().isAdmin;
-      final file = await deps.fileSyncService.exportToFile(includeAdminData: isAdmin);
+      final file = await deps.fileSyncService.exportToFile();
       await deps.fileSyncService.shareFile(file);
       setState(() {
         _isError = false;
@@ -228,6 +427,8 @@ class _SyncPageState extends State<SyncPage> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
+          _autoCard(context),
+          const SizedBox(height: AppSpacing.md),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),

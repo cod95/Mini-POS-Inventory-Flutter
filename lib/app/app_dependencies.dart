@@ -8,6 +8,7 @@ import '../core/services/stub_services.dart';
 import '../core/state/app_cubit.dart';
 import '../data/local/db/app_database.dart';
 import '../data/sync/file_sync_service.dart';
+import '../data/sync/lan_sync_service.dart';
 import '../data/local/seed/seed_data.dart';
 import '../data/repositories/local_repositories.dart';
 import '../domain/repositories/repositories.dart';
@@ -29,6 +30,7 @@ class AppDependencies {
     required this.receiptPdfService,
     required this.bluetoothPrinterService,
     required this.fileSyncService,
+    required this.lanSyncService,
     required this.appCubit,
   });
 
@@ -50,6 +52,7 @@ class AppDependencies {
   final BluetoothPrinterService bluetoothPrinterService;
 
   final FileSyncService fileSyncService;
+  final LanSyncService lanSyncService;
 
   final AppCubit appCubit;
 
@@ -72,11 +75,16 @@ class AppDependencies {
     final bluetoothPrinterService = BluetoothPrinterService();
     final syncService = FakeSyncService();
     final fileSyncService = FileSyncService(db);
+    final lanSyncService = LanSyncService(db, fileSyncService);
 
     final appCubit = AppCubit(
       authRepository: authRepository,
       settingsRepository: settingsRepository,
     )..initialize();
+
+    // Prices, users and store settings may arrive from the main phone.
+    lanSyncService.dataVersion.addListener(() => appCubit.refreshSettings());
+    lanSyncService.start();
 
     return AppDependencies._(
       rootNavigatorKey: rootNavigatorKey,
@@ -94,11 +102,13 @@ class AppDependencies {
       receiptPdfService: receiptPdfService,
       bluetoothPrinterService: bluetoothPrinterService,
       fileSyncService: fileSyncService,
+      lanSyncService: lanSyncService,
       appCubit: appCubit,
     );
   }
 
   Future<void> dispose() async {
+    await lanSyncService.stop();
     await appCubit.close();
     await database.close();
   }

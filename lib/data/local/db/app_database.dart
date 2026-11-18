@@ -60,6 +60,10 @@ class Products extends Table {
   /// Last time the product's catalog data (name, price…) was edited. Stock
   /// movements do not touch it, so a sync can tell who edited the price last.
   DateTimeColumn get catalogUpdatedAt => dateTime().nullable()();
+
+  /// Local clock: when this row last changed on THIS phone (by a sale, an
+  /// edit or an incoming sync). Lets a sync send only what is new.
+  DateTimeColumn get changedAt => dateTime().nullable().clientDefault(DateTime.now)();
 }
 
 class Categories extends Table {
@@ -83,6 +87,8 @@ class StockMovements extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   TextColumn get uuid => text().nullable().clientDefault(newUuid)();
+
+  DateTimeColumn get changedAt => dateTime().nullable().clientDefault(DateTime.now)();
 }
 
 class Customers extends Table {
@@ -174,6 +180,8 @@ class Sales extends Table {
   TextColumn get cashierName => text().nullable()();
 
   TextColumn get uuid => text().nullable().clientDefault(newUuid)();
+
+  DateTimeColumn get changedAt => dateTime().nullable().clientDefault(DateTime.now)();
 }
 
 class SaleItems extends Table {
@@ -232,6 +240,40 @@ class UserAccounts extends Table {
 
   /// True while the account still uses a default password / PIN.
   BoolColumn get mustChangeSecret => boolean().withDefault(const Constant(false))();
+}
+
+/// Products deleted on this phone (or learnt from another). Sent along in a
+/// sync so the deletion reaches the other phones and the product is not
+/// brought back by them.
+class DeletedRecords extends Table {
+  TextColumn get uuid => text()();
+
+  /// 'product' or 'user'.
+  TextColumn get kind => text().withDefault(const Constant('product'))();
+
+  DateTimeColumn get deletedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {uuid};
+}
+
+/// What this phone knows about the other phones it syncs with over the
+/// network: when it last sent to / received from each of them.
+class SyncPeers extends Table {
+  TextColumn get deviceId => text()();
+
+  TextColumn get name => text().withDefault(const Constant(''))();
+
+  /// This phone's clock at the start of the last successful send.
+  DateTimeColumn get lastPushAt => dateTime().nullable()();
+
+  /// The OTHER phone's clock at the last successful receive.
+  DateTimeColumn get lastPullAt => dateTime().nullable()();
+
+  DateTimeColumn get lastSyncAt => dateTime().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {deviceId};
 }
 
 class AppSettings extends Table {
@@ -293,6 +335,17 @@ class AppSettings extends Table {
   /// leaves the phone during sync. Local only, never inside a sync package.
   TextColumn get syncCode => text().nullable()();
 
+  /// The phone of the shop owner. It is the hub: other phones send it their
+  /// sales and receive products, prices, users and settings from it.
+  BoolColumn get isMainDevice => boolean().withDefault(const Constant(false))();
+
+  /// Sync over the shop's Wi-Fi automatically while the app is open.
+  BoolColumn get autoSync => boolean().withDefault(const Constant(true))();
+
+  /// Typed address of the main phone when automatic discovery is blocked by
+  /// the router (e.g. 192.168.1.20).
+  TextColumn get hubAddress => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -309,13 +362,15 @@ class AppSettings extends Table {
     SaleItems,
     AppSettings,
     UserAccounts,
+    DeletedRecords,
+    SyncPeers,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -377,6 +432,48 @@ class AppDatabase extends _$AppDatabase {
             await customStatement(
               "UPDATE user_accounts SET must_change_secret = 1 WHERE secret IN ('admin123', '1234')",
             );
+          }
+          if (from < 12) {
+            await m.addColumn(products, products.changedAt);
+            await m.addColumn(stockMovements, stockMovements.changedAt);
+            await m.addColumn(sales, sales.changedAt);
+            await m.addColumn(appSettings, appSettings.isMainDevice);
+            await m.addColumn(appSettings, appSettings.autoSync);
+            await m.addColumn(appSettings, appSettings.hubAddress);
+            await m.createTable(deletedRecords);
+            await m.createTable(syncPeers);
+            for (final table in ['products', 'stock_movements', 'sales']) {
+              await customStatement(
+                "UPDATE $table SET changed_at = CAST(strftime('%s','now') AS INTEGER)",
+              );
+            }
+          }
+        },
+        beforeOpen: (details) async {
+          // Keep "changed on this phone" up to date for every edit, wherever
+          // in the code it happens.
+          for (final table in ['products', 'sales']) {
+            await customStatement(
+              'CREATE TRIGGER IF NOT EXISTS trg_${table}_touch AFTER UPDATE ON $table '
+              'WHEN NEW.changed_at IS OLD.changed_at '
+              'BEGIN UPDATE $table SET changed_at = CAST(strftime(\'%s\',\'now\') AS INTEGER) '
+              'WHERE id = NEW.id; END;',
+            );
+          }
+          // A row can never be stored twice under the same sync id.
+          for (final spec in const [
+            ['idx_products_uuid', 'products'],
+            ['idx_movements_uuid', 'stock_movements'],
+            ['idx_sales_uuid', 'sales'],
+            ['idx_sale_items_uuid', 'sale_items'],
+          ]) {
+            try {
+              await customStatement(
+                'CREATE UNIQUE INDEX IF NOT EXISTS ${spec[0]} ON ${spec[1]}(uuid)',
+              );
+            } catch (_) {
+              // Never block the app from opening over an index.
+            }
           }
         },
       );
