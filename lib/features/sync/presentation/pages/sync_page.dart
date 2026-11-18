@@ -11,6 +11,7 @@ import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/state/app_cubit.dart';
 import '../../../../data/sync/file_sync_service.dart';
 import '../../../../data/sync/lan_sync_service.dart';
+import '../../../license/presentation/pages/license_widgets.dart';
 
 /// Admin: send this phone's data to the other phone, or receive the other
 /// phone's file. Works through any file channel (WhatsApp, Bluetooth, USB).
@@ -421,6 +422,13 @@ class _SyncPageState extends State<SyncPage> {
   @override
   Widget build(BuildContext context) {
     final ar = context.l10n.isArabic;
+
+    if (!AppScope.of(context).licenseService.full) {
+      return Scaffold(
+        appBar: AppBar(title: Text(ar ? 'المزامنة بين الأجهزة' : 'Device sync')),
+        body: TrialLockedBody(ar: ar),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(ar ? 'المزامنة بين الأجهزة' : 'Device sync')),

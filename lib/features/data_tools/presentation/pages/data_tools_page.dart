@@ -13,6 +13,7 @@ import '../../../../core/services/excel_service.dart';
 import '../../../../core/state/app_cubit.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../domain/entities/app_entities.dart';
+import '../../../license/presentation/pages/license_widgets.dart';
 
 /// Excel import/export: fillable products template, inventory export,
 /// import from a filled template and a sales export.
@@ -261,6 +262,13 @@ class _DataToolsPageState extends State<DataToolsPage> {
   Widget build(BuildContext context) {
     final ar = context.l10n.isArabic;
     final deps = AppScope.of(context);
+
+    if (!deps.licenseService.full) {
+      return Scaffold(
+        appBar: AppBar(title: Text(ar ? 'Excel (استيراد وتصدير)' : 'Excel import / export')),
+        body: TrialLockedBody(ar: ar),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(ar ? 'Excel (استيراد وتصدير)' : 'Excel import / export')),

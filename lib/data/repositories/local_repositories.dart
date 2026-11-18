@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:drift/drift.dart';
 
 import '../../core/errors/app_exception.dart';
+import '../../core/license/license_gate.dart';
 import '../../core/models/app_models.dart';
 import '../../core/security/secret_hasher.dart';
 import '../../core/utils/money_calculator.dart';
@@ -13,7 +14,9 @@ import '../../domain/entities/app_entities.dart';
 import '../../domain/repositories/repositories.dart';
 
 class LocalAuthRepository implements AuthRepository {
-  LocalAuthRepository(this._db);
+  LocalAuthRepository(this._db, [LicenseGate? gate]) : _gate = gate ?? OpenGate();
+
+  final LicenseGate _gate;
 
   final AppDatabase _db;
 
@@ -150,6 +153,7 @@ class LocalAuthRepository implements AuthRepository {
     final newHash = cleanSecret.isEmpty ? null : await SecretHasher.hash(cleanSecret);
 
     if (id == null) {
+      _gate.requireFull(LicenseGate.usersMessage);
       final uuid = newUuid();
       if (role == UserRole.admin) {
         unawaited(DbSecurity.rememberKey(userUuid: uuid, secret: cleanSecret, secretHash: newHash!));
@@ -279,7 +283,9 @@ class LocalSettingsRepository implements SettingsRepository {
 }
 
 class LocalProductRepository implements ProductRepository {
-  LocalProductRepository(this._db);
+  LocalProductRepository(this._db, [LicenseGate? gate]) : _gate = gate ?? OpenGate();
+
+  final LicenseGate _gate;
 
   final AppDatabase _db;
 
@@ -453,6 +459,15 @@ class LocalProductRepository implements ProductRepository {
     final now = DateTime.now();
 
     if (input.id == null) {
+      if (!_gate.full) {
+        final countExp = _db.products.id.count();
+        final count = await (_db.selectOnly(_db.products)..addColumns([countExp]))
+                .map((row) => row.read(countExp) ?? 0)
+                .getSingle();
+        if (count >= LicenseGate.trialMaxProducts) {
+          throw AppException(LicenseGate.productsMessage);
+        }
+      }
       final id = await _db.into(_db.products).insert(
             ProductsCompanion.insert(
               name: input.name.trim(),
@@ -550,7 +565,9 @@ class LocalProductRepository implements ProductRepository {
 }
 
 class LocalSalesRepository implements SalesRepository {
-  LocalSalesRepository(this._db);
+  LocalSalesRepository(this._db, [LicenseGate? gate]) : _gate = gate ?? OpenGate();
+
+  final LicenseGate _gate;
 
   final AppDatabase _db;
 
@@ -558,6 +575,15 @@ class LocalSalesRepository implements SalesRepository {
   Future<SaleCheckoutResult> checkout(SaleCheckoutInput input) async {
     if (input.items.isEmpty) {
       throw AppException('Cart is empty');
+    }
+    if (!_gate.full) {
+      final countExp = _db.sales.id.count();
+      final count = await (_db.selectOnly(_db.sales)..addColumns([countExp]))
+          .map((row) => row.read(countExp) ?? 0)
+          .getSingle();
+      if (count >= LicenseGate.trialMaxInvoices) {
+        throw AppException(LicenseGate.invoicesMessage);
+      }
     }
 
     return _db.transaction(() async {

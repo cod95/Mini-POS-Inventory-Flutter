@@ -132,3 +132,32 @@ class _ActivationFormState extends State<ActivationForm> {
     );
   }
 }
+
+/// Shown in place of a feature that needs the full licence.
+class TrialLockedBody extends StatelessWidget {
+  const TrialLockedBody({super.key, required this.ar});
+
+  final bool ar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.lock_outline, size: 44),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              ar
+                  ? 'هذه الميزة غير متاحة في النسخة التجريبية.\nللحصول على الترخيص تواصل مع المطوّر.'
+                  : 'This feature is not available in the trial version.\nContact the developer to get a licence.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

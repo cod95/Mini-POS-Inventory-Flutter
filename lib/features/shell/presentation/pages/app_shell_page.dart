@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/app_scope.dart';
+import '../../../../app/theme/app_theme.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/models/app_models.dart';
 import '../../../../core/state/app_cubit.dart';
@@ -43,7 +45,32 @@ class AppShellPage extends StatelessWidget {
     }
 
     return Scaffold(
-      body: SafeArea(child: child),
+      body: SafeArea(
+        child: Column(
+          children: [
+            ListenableBuilder(
+              listenable: AppScope.of(context).licenseService,
+              builder: (context, _) {
+                if (AppScope.of(context).licenseService.full) return const SizedBox.shrink();
+                final scheme = Theme.of(context).colorScheme;
+                return Container(
+                  width: double.infinity,
+                  color: scheme.secondaryContainer,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
+                  child: Text(
+                    l10n.isArabic
+                        ? 'نسخة تجريبية محدودة — للتفعيل تواصل مع المطوّر'
+                        : 'Limited trial version — contact the developer to activate',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: scheme.onSecondaryContainer, fontSize: 12),
+                  ),
+                );
+              },
+            ),
+            Expanded(child: child),
+          ],
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         destinations: [

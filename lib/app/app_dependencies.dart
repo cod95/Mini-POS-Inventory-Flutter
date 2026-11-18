@@ -68,9 +68,12 @@ class AppDependencies {
     await SeedData(db).ensureSeeded();
 
     final settingsRepository = LocalSettingsRepository(db);
-    final productRepository = LocalProductRepository(db);
-    final authRepository = LocalAuthRepository(db);
-    final salesRepository = LocalSalesRepository(db);
+    final licenseService = LicenseService();
+    await licenseService.init();
+
+    final productRepository = LocalProductRepository(db, licenseService);
+    final authRepository = LocalAuthRepository(db, licenseService);
+    final salesRepository = LocalSalesRepository(db, licenseService);
     final partyRepository = LocalPartyRepository(db);
     final reportsRepository = LocalReportsRepository(db, productRepository);
 
@@ -83,9 +86,6 @@ class AppDependencies {
     final fileSyncService = FileSyncService(db);
     final lanSyncService = LanSyncService(db, fileSyncService);
     final backupService = BackupService(db);
-    final licenseService = LicenseService();
-    await licenseService.init();
-
     final appCubit = AppCubit(
       authRepository: authRepository,
       settingsRepository: settingsRepository,

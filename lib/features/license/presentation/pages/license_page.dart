@@ -4,6 +4,7 @@ import '../../../../app/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/license/license_config.dart';
+import '../../../../core/license/license_gate.dart';
 import '../../../../core/license/license_service.dart';
 import 'license_widgets.dart';
 
@@ -28,6 +29,10 @@ class LicensePage extends StatelessWidget {
           final String status;
           if (!LicenseConfig.configured) {
             status = ar ? 'نظام الترخيص غير مفعّل في هذه النسخة.' : 'Licensing is not enabled in this build.';
+          } else if (!service.full && info.state != LicenseState.clockTampered) {
+            status = ar
+                ? 'نسخة تجريبية محدودة (حتى ${LicenseGate.trialMaxProducts} منتجاً و${LicenseGate.trialMaxInvoices} فواتير، دون مستخدمين جدد أو مزامنة أو Excel). أدخل رمز التفعيل لإزالة القيود.'
+                : 'Limited trial. Enter an activation code to remove the limits.';
           } else if (info.masterUntil != null) {
             status = ar
                 ? 'مفتوح بواسطة المطوّر حتى ${_date(info.masterUntil!)}'
@@ -56,7 +61,7 @@ class LicensePage extends StatelessWidget {
               if (LicenseConfig.configured) ...[
                 const SizedBox(height: AppSpacing.lg),
                 Text(
-                  ar ? 'تجديد الترخيص' : 'Renew the licence',
+                  service.full ? (ar ? 'تجديد الترخيص' : 'Renew the licence') : (ar ? 'تفعيل الترخيص' : 'Activate the licence'),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: AppSpacing.sm),

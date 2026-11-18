@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import '../errors/app_exception.dart';
 import '../security/secret_hasher.dart';
 import 'license_config.dart';
+import 'license_gate.dart';
 import 'license_verifier.dart';
 
 enum LicenseState { ok, notActivated, expired, clockTampered, wrongDevice }
@@ -34,8 +35,8 @@ class LicenseInfo {
 
 /// Ties each installation to one device and to a licence code signed by the
 /// developer. Without a valid code (or the developer's master password) the
-/// app stays locked, so a copied app cannot be used or resold.
-class LicenseService extends ChangeNotifier {
+/// app runs as a limited trial, so a copied app cannot be used or resold.
+class LicenseService extends ChangeNotifier implements LicenseGate {
   LicenseService();
 
   static const String _kToken = 'qs_license_token';
@@ -53,7 +54,14 @@ class LicenseService extends ChangeNotifier {
   Timer? _timer;
 
   bool get enforced => LicenseConfig.configured;
-  bool get isOpen => !enforced || info.state == LicenseState.ok;
+
+  /// Full licence (or licensing switched off): every feature works.
+  @override
+  bool get full => !enforced || info.state == LicenseState.ok;
+
+  /// Only a tampered clock locks the app completely; without a valid licence
+  /// the app runs as a limited trial.
+  bool get isOpen => !enforced || info.state != LicenseState.clockTampered;
 
   Future<void> init() async {
     deviceId = await _loadOrCreateDeviceId();
