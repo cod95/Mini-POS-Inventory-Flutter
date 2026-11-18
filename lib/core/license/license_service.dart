@@ -63,6 +63,11 @@ class LicenseService extends ChangeNotifier implements LicenseGate {
   /// the app runs as a limited trial.
   bool get isOpen => !enforced || info.state != LicenseState.clockTampered;
 
+  @override
+  void requireFull(String message) {
+    if (!full) throw AppException(message);
+  }
+
   Future<void> init() async {
     deviceId = await _loadOrCreateDeviceId();
     await check();
