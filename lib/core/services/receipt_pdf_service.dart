@@ -210,7 +210,7 @@ class ReceiptPdfService {
                       pw.Expanded(
                         flex: 3,
                         child: pw.Text(
-                          toMain(item.priceSnapshot).toStringAsFixed(currencyDecimals),
+                          item.isFree ? 'Free' : toMain(item.priceSnapshot).toStringAsFixed(currencyDecimals),
                           style: style(),
                           textAlign: pw.TextAlign.right,
                         ),
@@ -218,7 +218,7 @@ class ReceiptPdfService {
                       pw.Expanded(
                         flex: 3,
                         child: pw.Text(
-                          toMain(item.lineTotal).toStringAsFixed(currencyDecimals),
+                          item.isFree ? 'Free' : toMain(item.lineTotal).toStringAsFixed(currencyDecimals),
                           style: style(),
                           textAlign: pw.TextAlign.right,
                         ),

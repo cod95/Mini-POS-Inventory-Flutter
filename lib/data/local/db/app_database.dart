@@ -209,6 +209,10 @@ class SaleItems extends Table {
   /// know how much of each original line was already returned.
   IntColumn get originalItemId => integer().nullable()();
 
+  /// Free goods (bonus): the line costs the customer nothing but still leaves
+  /// the stock, and its cost counts against the profit.
+  BoolColumn get isFree => boolean().withDefault(const Constant(false))();
+
   TextColumn get uuid => text().nullable().clientDefault(newUuid)();
 }
 
@@ -368,7 +372,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor}) : super(executor ?? DbSecurity.openConnection());
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -445,6 +449,9 @@ class AppDatabase extends _$AppDatabase {
                 "UPDATE $table SET changed_at = CAST(strftime('%s','now') AS INTEGER)",
               );
             }
+          }
+          if (from < 13) {
+            await m.addColumn(saleItems, saleItems.isFree);
           }
         },
         beforeOpen: (details) async {

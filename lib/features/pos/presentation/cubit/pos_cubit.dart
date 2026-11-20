@@ -253,7 +253,8 @@ class PosCubit extends Cubit<PosState> {
   }
 
   void addProductToCart(ProductView product) {
-    final existingIndex = state.cart.indexWhere((item) => item.productId == product.id);
+    final existingIndex =
+        state.cart.indexWhere((item) => item.productId == product.id && !item.isFree);
     final updated = [...state.cart];
 
     if (existingIndex == -1) {
@@ -277,9 +278,38 @@ class PosCubit extends Cubit<PosState> {
     emit(state.copyWith(cart: updated, paid: state.total, clearError: true, clearLastResult: true));
   }
 
-  void updateItemQty(int productId, int qty) {
+  /// "F": adds one unit of the product as free goods, on its own line right
+  /// under the paid line. Its quantity is then changed with + and -.
+  void addFreeUnit(int productId) {
     final updated = [...state.cart];
-    final index = updated.indexWhere((item) => item.productId == productId);
+    final paidIndex = updated.indexWhere((item) => item.productId == productId && !item.isFree);
+    final freeIndex = updated.indexWhere((item) => item.productId == productId && item.isFree);
+    if (freeIndex != -1) {
+      updated[freeIndex] = updated[freeIndex].copyWith(qty: updated[freeIndex].qty + 1);
+    } else if (paidIndex != -1) {
+      final base = updated[paidIndex];
+      updated.insert(
+        paidIndex + 1,
+        CartItem(
+          productId: base.productId,
+          name: base.name,
+          sku: base.sku,
+          barcode: base.barcode,
+          cost: base.cost,
+          price: 0,
+          qty: 1,
+          isFree: true,
+        ),
+      );
+    } else {
+      return;
+    }
+    emit(state.copyWith(cart: updated, paid: state.total, clearError: true, clearLastResult: true));
+  }
+
+  void updateItemQty(int productId, int qty, {bool free = false}) {
+    final updated = [...state.cart];
+    final index = updated.indexWhere((item) => item.productId == productId && item.isFree == free);
     if (index == -1) return;
 
     if (qty <= 0) {
@@ -290,14 +320,15 @@ class PosCubit extends Cubit<PosState> {
     emit(state.copyWith(cart: updated, paid: state.total));
   }
 
-  void removeFromCart(int productId) {
-    final updated = state.cart.where((item) => item.productId != productId).toList();
+  void removeFromCart(int productId, {bool free = false}) {
+    final updated =
+        state.cart.where((item) => !(item.productId == productId && item.isFree == free)).toList();
     emit(state.copyWith(cart: updated, paid: state.total));
   }
 
   void setItemDiscount(int productId, double discount) {
     final updated = [...state.cart];
-    final index = updated.indexWhere((item) => item.productId == productId);
+    final index = updated.indexWhere((item) => item.productId == productId && !item.isFree);
     if (index == -1) return;
     final item = updated[index];
     updated[index] = item.copyWith(discount: max(0, discount));
@@ -306,7 +337,7 @@ class PosCubit extends Cubit<PosState> {
 
   void setItemPrice(int productId, double price) {
     final updated = [...state.cart];
-    final index = updated.indexWhere((item) => item.productId == productId);
+    final index = updated.indexWhere((item) => item.productId == productId && !item.isFree);
     if (index == -1) return;
     final item = updated[index];
     updated[index] = item.copyWith(price: max(0, price));

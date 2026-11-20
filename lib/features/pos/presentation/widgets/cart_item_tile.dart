@@ -16,6 +16,7 @@ class CartItemTile extends StatelessWidget {
     required this.onRemove,
     required this.onDiscountEdit,
     required this.onPriceEdit,
+    required this.onFree,
   });
 
   final CartItem item;
@@ -27,11 +28,14 @@ class CartItemTile extends StatelessWidget {
   final ValueChanged<double> onDiscountEdit;
   final ValueChanged<double> onPriceEdit;
 
+  /// "F": add one unit of this product as free goods.
+  final VoidCallback onFree;
+
   @override
   Widget build(BuildContext context) {
     final lineTotal = (item.price * item.qty) - item.discount;
     return Dismissible(
-      key: ValueKey('cart_${item.productId}'),
+      key: ValueKey('cart_${item.productId}_${item.isFree}'),
       direction: DismissDirection.endToStart,
       onDismissed: (_) => onRemove(),
       background: Container(
@@ -55,21 +59,49 @@ class CartItemTile extends StatelessWidget {
                     child: Text(item.name, style: Theme.of(context).textTheme.titleMedium),
                   ),
                   Text(
-                    AppFormatters.money(lineTotal, currency: currency),
-                    style: Theme.of(context).textTheme.titleMedium,
+                    item.isFree ? 'Free' : AppFormatters.money(lineTotal, currency: currency),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: item.isFree ? Theme.of(context).colorScheme.tertiary : null,
+                          fontWeight: item.isFree ? FontWeight.w700 : null,
+                        ),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
-              Row(
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  _QtyButton(icon: Icons.remove, onTap: onDecrease),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                    child: Text('${item.qty}', style: Theme.of(context).textTheme.titleMedium),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _QtyButton(icon: Icons.remove, onTap: onDecrease),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                        child: Text('${item.qty}', style: Theme.of(context).textTheme.titleMedium),
+                      ),
+                      _QtyButton(icon: Icons.add, onTap: onIncrease),
+                    ],
                   ),
-                  _QtyButton(icon: Icons.add, onTap: onIncrease),
-                  const Spacer(),
+                  if (!item.isFree)
+                    Tooltip(
+                      message: context.l10n.isArabic ? 'بضاعة مجانية' : 'Free goods',
+                      child: OutlinedButton(
+                        onPressed: onFree,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(44, 36),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                        ),
+                        child: const Text('F', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  if (item.isFree)
+                    Text(
+                      context.l10n.isArabic ? 'بضاعة مجانية' : 'Free goods',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (!item.isFree)
                   TextButton.icon(
                     onPressed: () => _showAmountDialog(
                       context,
@@ -80,7 +112,7 @@ class CartItemTile extends StatelessWidget {
                     icon: const Icon(Icons.discount_outlined),
                     label: Text('${context.l10n.tr('discount')} ${item.discount.toStringAsFixed(2)}'),
                   ),
-                  if (canEditPrice)
+                  if (canEditPrice && !item.isFree)
                     TextButton.icon(
                       onPressed: () => _showAmountDialog(
                         context,

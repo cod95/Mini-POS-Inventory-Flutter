@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../domain/entities/app_entities.dart';
+import '../models/app_models.dart';
 import '../../domain/repositories/repositories.dart';
 
 class BluetoothPrinterDevice {
@@ -31,6 +32,7 @@ class BluetoothPrinterService {
       'totalLbp': 'Total (LBP)',
       'totalAfterTax': 'Total after TVA',
       'itemCount': 'Item count',
+      'freeGoods': 'Free goods given out',
       'title': 'Period Report',
       'period': 'Period',
       'invoicesSold': 'Invoices sold',
@@ -48,6 +50,7 @@ class BluetoothPrinterService {
       'totalLbp': 'المجموع بالليرة اللبنانية',
       'totalAfterTax': 'المجموع بعد TVA',
       'itemCount': 'عدد الأصناف',
+      'freeGoods': 'البضاعة المجانية المصروفة',
       'title': 'تقرير الفترة',
       'period': 'الفترة',
       'invoicesSold': 'عدد الفواتير المباعة',
@@ -189,12 +192,12 @@ class BluetoothPrinterService {
           PosColumn(text: name, width: 5),
           PosColumn(text: '${item.qty}', width: 2, styles: const PosStyles(align: PosAlign.center)),
           PosColumn(
-            text: toMain(item.priceSnapshot).toStringAsFixed(currencyDecimals),
+            text: item.isFree ? 'Free' : toMain(item.priceSnapshot).toStringAsFixed(currencyDecimals),
             width: 2,
             styles: const PosStyles(align: PosAlign.right),
           ),
           PosColumn(
-            text: toMain(item.lineTotal).toStringAsFixed(currencyDecimals),
+            text: item.isFree ? 'Free' : toMain(item.lineTotal).toStringAsFixed(currencyDecimals),
             width: 3,
             styles: const PosStyles(align: PosAlign.right),
           ),
@@ -235,6 +238,7 @@ class BluetoothPrinterService {
     required String currency,
     required String paperWidthMm,
     String languageCode = 'en',
+    List<FreeGoodsRow> freeGoods = const [],
   }) async {
     final t = _t(languageCode);
     final profile = await CapabilityProfile.load();
@@ -259,6 +263,18 @@ class BluetoothPrinterService {
     bytes.addAll(_totalRow(generator, t['invoicesReturned']!, '$returnCount'));
     bytes.addAll(_totalRow(generator, t['totalReturns']!, money(totalReturns)));
     bytes.addAll(generator.hr());
+    if (freeGoods.isNotEmpty) {
+      bytes.addAll(generator.text(t['freeGoods'] ?? 'Free goods given out', styles: const PosStyles(bold: true)));
+      for (final row in freeGoods) {
+        bytes.addAll(
+          generator.row([
+            PosColumn(text: row.productName, width: 9),
+            PosColumn(text: '${row.qty}', width: 3, styles: const PosStyles(align: PosAlign.right)),
+          ]),
+        );
+      }
+      bytes.addAll(generator.hr());
+    }
     for (final row in inventory) {
       bytes.addAll(
         generator.row([

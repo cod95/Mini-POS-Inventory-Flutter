@@ -173,6 +173,8 @@ abstract class ReportsRepository {
   Future<List<InventoryReportRow>> inventoryReportRows();
 
   Future<PeriodSummary> periodSummary({DateTime? from, DateTime? to});
+
+  Future<List<FreeGoodsRow>> freeGoods({DateTime? from, DateTime? to});
 }
 
 abstract class PartyRepository {

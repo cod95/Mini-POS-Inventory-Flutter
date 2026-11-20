@@ -68,6 +68,7 @@ class SaleItemView extends Equatable {
     required this.discount,
     required this.lineTotal,
     this.taxable = false,
+    this.isFree = false,
   });
 
   final int id;
@@ -81,6 +82,9 @@ class SaleItemView extends Equatable {
   final double lineTotal;
   final bool taxable;
 
+  /// Free goods line: shown as "Free" instead of a price.
+  final bool isFree;
+
   @override
   List<Object?> get props => [
         id,
@@ -93,6 +97,7 @@ class SaleItemView extends Equatable {
         discount,
         lineTotal,
         taxable,
+        isFree,
       ];
 }
 

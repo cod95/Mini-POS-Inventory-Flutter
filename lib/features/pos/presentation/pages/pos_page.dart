@@ -238,9 +238,12 @@ class _CartPane extends StatelessWidget {
                 item: item,
                 currency: currency,
                 canEditPrice: isAdmin,
-                onIncrease: () => context.read<PosCubit>().updateItemQty(item.productId, item.qty + 1),
-                onDecrease: () => context.read<PosCubit>().updateItemQty(item.productId, item.qty - 1),
-                onRemove: () => context.read<PosCubit>().removeFromCart(item.productId),
+                onIncrease: () =>
+                    context.read<PosCubit>().updateItemQty(item.productId, item.qty + 1, free: item.isFree),
+                onDecrease: () =>
+                    context.read<PosCubit>().updateItemQty(item.productId, item.qty - 1, free: item.isFree),
+                onRemove: () => context.read<PosCubit>().removeFromCart(item.productId, free: item.isFree),
+                onFree: () => context.read<PosCubit>().addFreeUnit(item.productId),
                 onDiscountEdit: (value) => context.read<PosCubit>().setItemDiscount(item.productId, value),
                 onPriceEdit: (value) => context.read<PosCubit>().setItemPrice(item.productId, value),
               );

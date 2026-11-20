@@ -18,6 +18,7 @@ class ReportsState extends Equatable {
     this.invoices = const [],
     this.salesByProduct = const [],
     this.lowStockProducts = const [],
+    this.freeGoods = const [],
     this.from,
     this.to,
     this.resetSince,
@@ -30,6 +31,7 @@ class ReportsState extends Equatable {
   final List<SaleSummary> invoices;
   final List<SalesByProductMetric> salesByProduct;
   final List<ProductView> lowStockProducts;
+  final List<FreeGoodsRow> freeGoods;
   final DateTime? from;
   final DateTime? to;
   final DateTime? resetSince;
@@ -43,6 +45,7 @@ class ReportsState extends Equatable {
     List<SaleSummary>? invoices,
     List<SalesByProductMetric>? salesByProduct,
     List<ProductView>? lowStockProducts,
+    List<FreeGoodsRow>? freeGoods,
     DateTime? from,
     DateTime? to,
     bool clearDates = false,
@@ -56,6 +59,7 @@ class ReportsState extends Equatable {
       invoices: invoices ?? this.invoices,
       salesByProduct: salesByProduct ?? this.salesByProduct,
       lowStockProducts: lowStockProducts ?? this.lowStockProducts,
+      freeGoods: freeGoods ?? this.freeGoods,
       from: clearDates ? null : from ?? this.from,
       to: clearDates ? null : to ?? this.to,
       resetSince: resetSince ?? this.resetSince,
@@ -71,6 +75,7 @@ class ReportsState extends Equatable {
         invoices,
         salesByProduct,
         lowStockProducts,
+        freeGoods,
         from,
         to,
         resetSince,
@@ -102,6 +107,7 @@ class ReportsCubit extends Cubit<ReportsState> {
       final salesByProduct =
           await _reportsRepository.salesByProduct(from: state.from, to: state.to);
       final lowStock = await _reportsRepository.lowStockProducts();
+      final freeGoods = await _reportsRepository.freeGoods(from: state.from, to: state.to);
       final invoices = await _salesRepository.getInvoices(
         filter: InvoiceFilter(from: state.from, to: state.to),
       );
@@ -113,6 +119,7 @@ class ReportsCubit extends Cubit<ReportsState> {
           invoices: invoices,
           salesByProduct: salesByProduct,
           lowStockProducts: lowStock,
+          freeGoods: freeGoods,
         ),
       );
     } on AppException catch (e) {
@@ -175,6 +182,7 @@ class ReportsCubit extends Cubit<ReportsState> {
       final to = state.to ?? DateTime.now();
       final summary = await _reportsRepository.periodSummary(from: from, to: to);
       final inventory = await _reportsRepository.inventoryReportRows();
+      final freeGoods = await _reportsRepository.freeGoods(from: from, to: to);
       double conv(double usd) => _toDisplay(usd, currency, exchangeRate);
 
       final file = await _exportService.generatePeriodReportPdf(
@@ -188,6 +196,7 @@ class ReportsCubit extends Cubit<ReportsState> {
         returnCount: summary.returnCount,
         totalReturns: conv(summary.totalReturns),
         inventory: inventory,
+        freeGoods: freeGoods,
         currency: currency,
         languageCode: languageCode,
       );
@@ -220,6 +229,7 @@ class ReportsCubit extends Cubit<ReportsState> {
       final to = state.to ?? DateTime.now();
       final summary = await _reportsRepository.periodSummary(from: from, to: to);
       final inventory = await _reportsRepository.inventoryReportRows();
+      final freeGoods = await _reportsRepository.freeGoods(from: from, to: to);
       double conv(double usd) => _toDisplay(usd, currency, exchangeRate);
 
       final connected = await _bluetoothPrinterService.connect(printerMacAddress);
@@ -238,6 +248,7 @@ class ReportsCubit extends Cubit<ReportsState> {
         returnCount: summary.returnCount,
         totalReturns: conv(summary.totalReturns),
         inventory: inventory,
+        freeGoods: freeGoods,
         currency: currency,
         paperWidthMm: paperWidthMm,
         languageCode: languageCode,

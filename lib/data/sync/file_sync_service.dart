@@ -277,6 +277,7 @@ class FileSyncService {
                   'discount': i.discount,
                   'lineTotal': i.lineTotal,
                   'taxable': i.taxable,
+                  'isFree': i.isFree,
                   'originalItemUuid': i.originalItemId == null ? null : itemUuid[i.originalItemId],
                 },
             ],
@@ -785,6 +786,7 @@ class FileSyncService {
                   discount: Value((i['discount'] as num).toDouble()),
                   lineTotal: (i['lineTotal'] as num).toDouble(),
                   taxable: Value(i['taxable'] == true),
+                  isFree: Value(i['isFree'] == true),
                   uuid: Value(itemUuid),
                 ),
               );

@@ -428,6 +428,7 @@ class CartItem extends Equatable {
     required this.qty,
     this.discount = 0,
     this.taxable = false,
+    this.isFree = false,
   });
 
   final int productId;
@@ -439,6 +440,9 @@ class CartItem extends Equatable {
   final int qty;
   final double discount;
   final bool taxable;
+
+  /// Free goods line (price 0, still leaves the stock).
+  final bool isFree;
 
   CartItem copyWith({
     int? qty,
@@ -455,6 +459,7 @@ class CartItem extends Equatable {
       qty: qty ?? this.qty,
       discount: discount ?? this.discount,
       taxable: taxable,
+      isFree: isFree,
     );
   }
 
@@ -469,7 +474,22 @@ class CartItem extends Equatable {
         qty,
         discount,
         taxable,
+        isFree,
       ];
+}
+
+/// Free goods handed out in a period (net of returns), for the reports.
+class FreeGoodsRow extends Equatable {
+  const FreeGoodsRow({required this.productName, required this.qty, required this.cost});
+
+  final String productName;
+  final int qty;
+
+  /// What the free goods cost the shop (USD).
+  final double cost;
+
+  @override
+  List<Object?> get props => [productName, qty, cost];
 }
 
 class DashboardMetrics extends Equatable {

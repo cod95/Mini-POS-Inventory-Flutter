@@ -193,11 +193,11 @@ class _InvoiceDetailView extends StatelessWidget {
                                       child: Text('${item.qty}', textAlign: TextAlign.center),
                                     ),
                                     Expanded(
-                                      child: Text(item.priceSnapshot.toStringAsFixed(2),
+                                      child: Text(item.isFree ? 'Free' : item.priceSnapshot.toStringAsFixed(2),
                                           textAlign: TextAlign.end),
                                     ),
                                     Expanded(
-                                      child: Text(item.lineTotal.toStringAsFixed(2),
+                                      child: Text(item.isFree ? 'Free' : item.lineTotal.toStringAsFixed(2),
                                           textAlign: TextAlign.end),
                                     ),
                                   ],

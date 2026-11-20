@@ -11,6 +11,7 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../domain/repositories/repositories.dart';
+import '../models/app_models.dart';
 
 class FileExportService {
   pw.Font? _arabicFont;
@@ -78,6 +79,8 @@ class FileExportService {
       'inventory': 'Remaining inventory',
       'product': 'Product',
       'stock': 'Stock',
+      'freeGoods': 'Free goods given out',
+      'qty': 'Qty',
     },
     'ar': {
       'title': 'تقرير الفترة',
@@ -91,6 +94,8 @@ class FileExportService {
       'inventory': 'جردة المخزون المتبقي',
       'product': 'الصنف',
       'stock': 'الكمية المتبقية',
+      'freeGoods': 'البضاعة المجانية المصروفة',
+      'qty': 'الكمية',
     },
   };
 
@@ -125,6 +130,7 @@ class FileExportService {
     required List<InventoryReportRow> inventory,
     required String currency,
     String languageCode = 'en',
+    List<FreeGoodsRow> freeGoods = const [],
   }) async {
     final lang = _periodLabels.containsKey(languageCode) ? languageCode : 'en';
     final t = _periodLabels[lang]!;
@@ -199,6 +205,39 @@ class FileExportService {
                 summaryRow(t['totalReturns']!, money(totalReturns)),
               ],
             ),
+            if (freeGoods.isNotEmpty) ...[
+              pw.SizedBox(height: 12),
+              _dirText(t['freeGoods']!, pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold), textAlign: labelAlign),
+              pw.SizedBox(height: 5),
+              pw.Table(
+                border: pw.TableBorder.all(width: 0.4),
+                columnWidths: isRtl
+                    ? const {0: pw.FlexColumnWidth(1), 1: pw.FlexColumnWidth(4)}
+                    : const {0: pw.FlexColumnWidth(4), 1: pw.FlexColumnWidth(1)},
+                children: [
+                  pw.TableRow(
+                    children: cells(
+                      pw.Padding(padding: const pw.EdgeInsets.all(3), child: _dirText(t['product']!, bold, textAlign: labelAlign)),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(3),
+                        child: _dirText(t['qty']!, bold, textAlign: pw.TextAlign.center),
+                      ),
+                    ),
+                  ),
+                  ...freeGoods.map(
+                    (row) => pw.TableRow(
+                      children: cells(
+                        pw.Padding(padding: const pw.EdgeInsets.all(3), child: _dirText(row.productName, normal, textAlign: labelAlign)),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(3),
+                          child: pw.Text('${row.qty}', style: normal, textAlign: pw.TextAlign.center),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             pw.SizedBox(height: 12),
             _dirText(t['inventory']!, pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold), textAlign: labelAlign),
             pw.SizedBox(height: 5),

@@ -599,15 +599,20 @@ class LocalSalesRepository implements SalesRepository {
           .get();
       final productById = {for (final product in products) product.id: product};
 
+      // A product can appear twice (paid line + free goods line): the stock
+      // must cover both together.
+      final wantedQty = <int, int>{};
       for (final item in input.items) {
         final product = productById[item.productId];
         if (product == null) {
           throw AppException('Product ${item.name} no longer exists');
         }
-        if (!allowNegativeStock && product.stockQty < item.qty) {
+        wantedQty[item.productId] = (wantedQty[item.productId] ?? 0) + item.qty;
+        if (!allowNegativeStock && product.stockQty < wantedQty[item.productId]!) {
           throw AppException('Insufficient stock for ${item.name}');
         }
       }
+      final stockLeft = {for (final product in products) product.id: product.stockQty};
 
       final lineTotals = input.items
           .map(
@@ -688,17 +693,20 @@ class LocalSalesRepository implements SalesRepository {
                 productId: item.productId,
                 nameSnapshot: item.name,
                 costSnapshot: item.cost,
-                priceSnapshot: item.price,
+                priceSnapshot: item.isFree ? 0 : item.price,
                 qty: item.qty,
-                discount: Value(item.discount),
-                lineTotal: lineTotals[i],
-                taxable: Value(product.taxable),
+                discount: Value(item.isFree ? 0 : item.discount),
+                lineTotal: item.isFree ? 0 : lineTotals[i],
+                taxable: Value(item.isFree ? false : product.taxable),
+                isFree: Value(item.isFree),
               ),
             );
 
+        final remaining = stockLeft[product.id]! - item.qty;
+        stockLeft[product.id] = remaining;
         await (_db.update(_db.products)..where((tbl) => tbl.id.equals(product.id))).write(
           ProductsCompanion(
-            stockQty: Value(product.stockQty - item.qty),
+            stockQty: Value(remaining),
             updatedAt: Value(now),
           ),
         );
@@ -708,7 +716,7 @@ class LocalSalesRepository implements SalesRepository {
                 productId: product.id,
                 type: StockMovementType.sale.value,
                 qtyChange: -item.qty,
-                reason: Value('Sale $invoiceNo'),
+                reason: Value(item.isFree ? 'Sale $invoiceNo (free goods)' : 'Sale $invoiceNo'),
                 createdAt: Value(now),
               ),
             );
@@ -927,6 +935,7 @@ class LocalSalesRepository implements SalesRepository {
                 discount: Value(discount),
                 lineTotal: -base,
                 taxable: Value(original.taxable),
+                isFree: Value(original.isFree),
                 originalItemId: Value(original.id),
               ),
             );
@@ -1059,6 +1068,7 @@ class LocalSalesRepository implements SalesRepository {
       discount: item.discount,
       lineTotal: item.lineTotal,
       taxable: item.taxable,
+      isFree: item.isFree,
     );
   }
 
@@ -1180,7 +1190,7 @@ class LocalReportsRepository implements ReportsRepository {
     final monthProfit = MoneyCalculator.round2(monthSales - _itemsCost(monthItems));
 
     final qtyMap = <String, int>{};
-    for (final item in monthItems) {
+    for (final item in monthItems.where((item) => !item.isFree)) {
       qtyMap[item.nameSnapshot] = (qtyMap[item.nameSnapshot] ?? 0) + item.qty;
     }
     final bestSellers = qtyMap.entries
@@ -1265,7 +1275,7 @@ class LocalReportsRepository implements ReportsRepository {
         .get();
 
     final metrics = <int, SalesByProductMetric>{};
-    for (final item in items) {
+    for (final item in items.where((item) => !item.isFree)) {
       final existing = metrics[item.productId];
       metrics[item.productId] = SalesByProductMetric(
         productId: item.productId,
@@ -1277,6 +1287,43 @@ class LocalReportsRepository implements ReportsRepository {
 
     final list = metrics.values.where((m) => m.qty != 0).toList()..sort((a, b) => b.total.compareTo(a.total));
     return list;
+  }
+
+  /// Free goods handed out in the period, net of returns, per product.
+  @override
+  Future<List<FreeGoodsRow>> freeGoods({DateTime? from, DateTime? to}) async {
+    final sales = await _db.select(_db.sales).get();
+    final ids = sales
+        .where(_isLedgerDoc)
+        .where((sale) {
+          final fromOk = from == null || !sale.createdAt.isBefore(from);
+          final toOk = to == null || !sale.createdAt.isAfter(to.add(const Duration(days: 1)));
+          return fromOk && toOk;
+        })
+        .map((e) => e.id)
+        .toList();
+    if (ids.isEmpty) return const [];
+
+    final items = await (_db.select(_db.saleItems)
+          ..where((tbl) => tbl.saleId.isIn(ids) & tbl.isFree.equals(true)))
+        .get();
+
+    final qtyByName = <String, int>{};
+    final costByName = <String, double>{};
+    for (final item in items) {
+      qtyByName[item.nameSnapshot] = (qtyByName[item.nameSnapshot] ?? 0) + item.qty;
+      costByName[item.nameSnapshot] =
+          (costByName[item.nameSnapshot] ?? 0) + item.costSnapshot * item.qty;
+    }
+    return [
+      for (final entry in qtyByName.entries)
+        if (entry.value != 0)
+          FreeGoodsRow(
+            productName: entry.key,
+            qty: entry.value,
+            cost: MoneyCalculator.round2(costByName[entry.key] ?? 0),
+          ),
+    ]..sort((a, b) => b.qty.compareTo(a.qty));
   }
 
   @override

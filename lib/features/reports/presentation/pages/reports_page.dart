@@ -276,6 +276,10 @@ class _ReportsView extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 _BestSellersCard(state: state),
                 const SizedBox(height: AppSpacing.md),
+                if (state.freeGoods.isNotEmpty) ...[
+                  _FreeGoodsCard(state: state),
+                  const SizedBox(height: AppSpacing.md),
+                ],
                 _SalesByProductCard(state: state, currency: currency, exchangeRate: exchangeRate),
                 const SizedBox(height: AppSpacing.md),
                 _LowStockCard(state: state),
@@ -562,6 +566,43 @@ class _InvoiceHistoryCard extends StatelessWidget {
                     ],
                   ),
                   onTap: () => context.push('/reports/invoice/${invoice.id}'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Free goods handed out in the selected period (net of returns).
+class _FreeGoodsCard extends StatelessWidget {
+  const _FreeGoodsCard({required this.state});
+
+  final ReportsState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = context.l10n.isArabic;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              ar ? 'البضاعة المجانية المصروفة' : 'Free goods given out',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            for (final row in state.freeGoods)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(row.productName)),
+                    Text('${row.qty}', style: Theme.of(context).textTheme.titleSmall),
+                  ],
                 ),
               ),
           ],
